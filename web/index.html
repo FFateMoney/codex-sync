@@ -251,7 +251,7 @@
   </section>
 
   <aside id="detail" class="detail" hidden><div class="detail-header"><h2>线程详情</h2><button id="close-detail" class="button ghost" type="button">关闭</button></div><div id="detail-title" class="detail-title"></div><div class="detail-grid"><div><small>线程 ID</small><span id="detail-id"></span></div><div><small>更新时间</small><span id="detail-time"></span></div><div><small>来源</small><span>本机 Codex 索引</span></div><div><small>状态</small><span id="detail-status"></span></div></div><p class="muted" style="margin-top:26px;font-size:.82rem">此视图不读取聊天内容。上传、下载与云端版本将在远端列表完成后提供。</p></aside>
-  <aside id="restore-command" class="detail" hidden><div class="detail-header"><h2>生成恢复命令</h2><button id="close-restore-command" class="button ghost" type="button">关闭</button></div><p class="muted" style="margin-top:20px;font-size:.84rem">网页不会写入本机 Codex。填写目标目录后，将命令复制到本机终端执行。</p><label style="margin-top:22px">目标 Codex 目录 <input id="restore-codex-home" value="~/.codex" spellcheck="false"></label><div class="path-box" style="align-items:flex-start;margin-top:18px"><code id="restore-command-text" style="white-space:pre-wrap;word-break:break-all"></code></div><button id="copy-restore-command" class="button wide" style="margin-top:14px" type="button">复制恢复命令</button><p class="muted" style="margin-top:18px;font-size:.78rem">请在包含 <code>codex_sync.py</code> 的项目目录中执行；当前验证服务器使用自签名证书，因此命令包含 <code>--insecure</code>。</p></aside>
+  <aside id="restore-command" class="detail" hidden><div class="detail-header"><h2>生成恢复命令</h2><button id="close-restore-command" class="button ghost" type="button">关闭</button></div><p class="muted" style="margin-top:20px;font-size:.84rem">网页不会写入本机 Codex。填写目标目录后，将命令复制到本机终端执行。</p><label style="margin-top:22px">目标 Codex 目录 <input id="restore-codex-home" value="~/.codex" spellcheck="false"></label><p class="muted" style="margin:20px 0 7px;font-size:.78rem">推荐：已通过 pipx 安装 codex-sync 时使用</p><div class="path-box" style="align-items:flex-start"><code id="restore-cli-command-text" style="white-space:pre-wrap;word-break:break-all"></code></div><button id="copy-restore-cli-command" class="button wide" style="margin-top:10px" type="button">复制 codex-sync 命令</button><p class="muted" style="margin:20px 0 7px;font-size:.78rem">备用：直接在项目目录中运行</p><div class="path-box" style="align-items:flex-start"><code id="restore-command-text" style="white-space:pre-wrap;word-break:break-all"></code></div><button id="copy-restore-command" class="button wide" style="margin-top:10px" type="button">复制 Python 脚本命令</button><p class="muted" style="margin-top:18px;font-size:.78rem">未安装时可执行 <code>pipx install git+https://github.com/FFateMoney/codex-sync.git</code>。当前验证服务器使用自签名证书，因此命令包含 <code>--insecure</code>。</p></aside>
   <div id="toast" class="toast" hidden></div>
 
   <script>
@@ -456,8 +456,9 @@
     function updateRestoreCommand() {
       if (!restorePackage) return;
       const target = document.querySelector('#restore-codex-home').value.trim() || '~/.codex';
-      const command = [`python3 codex_sync.py pull`, `--insecure`, `--url ${shellQuote(window.location.origin)}`, `--account ${shellQuote(currentAccount)}`, `--tag ${shellQuote(restorePackage.tag)}`, `--package-id ${shellQuote(restorePackage.package_id)}`, `--codex-home ${shellQuote(target)}`].join(' ');
-      document.querySelector('#restore-command-text').textContent = command;
+      const argumentsList = [`--insecure`, `--url ${shellQuote(window.location.origin)}`, `--account ${shellQuote(currentAccount)}`, `--tag ${shellQuote(restorePackage.tag)}`, `--package-id ${shellQuote(restorePackage.package_id)}`, `--codex-home ${shellQuote(target)}`];
+      document.querySelector('#restore-cli-command-text').textContent = [`codex-sync pull`, ...argumentsList].join(' ');
+      document.querySelector('#restore-command-text').textContent = [`python3 codex_sync.py pull`, ...argumentsList].join(' ');
     }
 
     function openRestoreCommand(item) {
@@ -485,7 +486,8 @@
     document.querySelector('#close-detail').addEventListener('click', () => { document.querySelector('#detail').hidden = true; });
     document.querySelector('#close-restore-command').addEventListener('click', () => { document.querySelector('#restore-command').hidden = true; });
     document.querySelector('#restore-codex-home').addEventListener('input', updateRestoreCommand);
-    document.querySelector('#copy-restore-command').addEventListener('click', async () => { try { await navigator.clipboard.writeText(document.querySelector('#restore-command-text').textContent); showToast('恢复命令已复制。'); } catch { showToast('无法自动复制，请手动复制命令。'); } });
+    document.querySelector('#copy-restore-cli-command').addEventListener('click', async () => { try { await navigator.clipboard.writeText(document.querySelector('#restore-cli-command-text').textContent); showToast('codex-sync 恢复命令已复制。'); } catch { showToast('无法自动复制，请手动复制命令。'); } });
+    document.querySelector('#copy-restore-command').addEventListener('click', async () => { try { await navigator.clipboard.writeText(document.querySelector('#restore-command-text').textContent); showToast('Python 脚本恢复命令已复制。'); } catch { showToast('无法自动复制，请手动复制命令。'); } });
     document.querySelector('#logout').addEventListener('click', async () => { await requestJson('/v1/auth/logout', { method: 'POST' }); document.querySelector('#detail').hidden = true; show(loginView); say(loginStatus, '已退出登录。'); });
     threadSearch.addEventListener('input', renderThreads); threadFilter.addEventListener('change', renderThreads);
     document.querySelector('#local-nav').addEventListener('click', () => switchWorkspace('local'));
