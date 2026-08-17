@@ -1,0 +1,18 @@
+[Unit]
+Description=codex-sync proof-of-concept package storage
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/codex-sync
+ExecStart=/usr/bin/python3 /opt/codex-sync/codex_sync_server.py --root /var/lib/codex-sync --bind 127.0.0.1 --port 25563
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/var/lib/codex-sync
+
+[Install]
+WantedBy=multi-user.target
