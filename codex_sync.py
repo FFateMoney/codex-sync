@@ -150,6 +150,7 @@ def pack(args: argparse.Namespace) -> None:
 
 
 def url_for(args: argparse.Namespace) -> str:
+    resolve_account(args)
     for value, label in ((args.account, "account"), (args.tag, "tag"), (args.package_id, "package id")):
         if not IDENTIFIER.fullmatch(value):
             raise SyncError(f"invalid {label}; use letters, digits, '.', '_' or '-'")
@@ -179,7 +180,28 @@ def write_auth_records(records: dict) -> None:
     os.replace(temporary_path, AUTH_FILE)
 
 
+def resolve_account(args: argparse.Namespace) -> str:
+    """Use an explicit account or infer the only saved login for this URL."""
+    if args.account:
+        return args.account
+    if not args.url:
+        raise SyncError("missing server URL; pass --url or run 'codex-sync login'")
+    url = args.url.rstrip("/")
+    matches = []
+    for key, record in read_auth_records().items():
+        saved_url, separator, account = key.partition("\n")
+        if separator and saved_url == url and isinstance(record, dict) and isinstance(record.get("session_token"), str):
+            matches.append(account)
+    if len(matches) == 1:
+        args.account = matches[0]
+        return args.account
+    if not matches:
+        raise SyncError(f"no saved login for {url}; run 'codex-sync login --url {url}' or pass --account")
+    raise SyncError(f"multiple saved accounts exist for {url}; pass --account")
+
+
 def authorization_header(args: argparse.Namespace) -> dict[str, str]:
+    resolve_account(args)
     record = read_auth_records().get(auth_key(args.url, args.account))
     if isinstance(record, dict) and isinstance(record.get("session_token"), str):
         return {"Cookie": f"codex_sync_session={record['session_token']}"}
@@ -248,6 +270,14 @@ def download(args: argparse.Namespace) -> None:
 
 
 def login(args: argparse.Namespace) -> None:
+    if not args.url:
+        args.url = input("Server URL: ").strip()
+    if not args.url:
+        raise SyncError("server URL cannot be empty")
+    if not args.account:
+        args.account = input("Account: ").strip()
+    if not args.account:
+        raise SyncError("account cannot be empty")
     password = getpass.getpass(f"Password for {args.account}: ")
     payload = json.dumps({"username": args.account, "password": password}).encode("utf-8")
     req = request.Request(
@@ -274,6 +304,7 @@ def login(args: argparse.Namespace) -> None:
 
 
 def logout(args: argparse.Namespace) -> None:
+    resolve_account(args)
     records = read_auth_records()
     record = records.pop(auth_key(args.url, args.account), None)
     if isinstance(record, dict) and isinstance(record.get("session_token"), str):
@@ -293,6 +324,7 @@ def logout(args: argparse.Namespace) -> None:
 
 
 def list_packages(args: argparse.Namespace) -> None:
+    resolve_account(args)
     req = request.Request(
         f"{args.url.rstrip('/')}/v1/accounts/{args.account}/packages",
         method="GET",
@@ -498,8 +530,8 @@ def parser() -> argparse.ArgumentParser:
     commands = root.add_subparsers(dest="command", required=True)
 
     def add_connection(command: argparse.ArgumentParser) -> None:
-        command.add_argument("--url", required=True)
-        command.add_argument("--account", required=True)
+        command.add_argument("--url", required=False)
+        command.add_argument("--account", required=False)
         command.add_argument("--timeout", type=float, default=60)
         command.add_argument("--insecure", action="store_true", help="allow a self-signed HTTPS certificate")
 
@@ -531,7 +563,7 @@ def parser() -> argparse.ArgumentParser:
     for name, func, help_text in (("upload", upload, "upload a package"), ("download", download, "download a package")):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("--url", required=True)
-        command.add_argument("--account", required=True)
+        command.add_argument("--account", help="saved login account; inferred when this URL has one")
         command.add_argument("--tag", required=True)
         command.add_argument("--package-id", required=True)
         command.add_argument("--timeout", type=float, default=60)
@@ -545,7 +577,7 @@ def parser() -> argparse.ArgumentParser:
 
     push_command = commands.add_parser("push", help="package and upload one Codex thread")
     push_command.add_argument("--url", required=True)
-    push_command.add_argument("--account", required=True)
+    push_command.add_argument("--account", help="saved login account; inferred when this URL has one")
     push_command.add_argument("--tag", required=True)
     push_command.add_argument("--session", required=True)
     push_command.add_argument("--codex-home", default=str(default_codex_home()))
@@ -557,7 +589,7 @@ def parser() -> argparse.ArgumentParser:
 
     pull_command = commands.add_parser("pull", help="download, restore, and register one Codex thread")
     pull_command.add_argument("--url", required=True)
-    pull_command.add_argument("--account", required=True)
+    pull_command.add_argument("--account", help="saved login account; inferred when this URL has one")
     pull_command.add_argument("--tag", required=True)
     pull_command.add_argument("--package-id", required=True)
     pull_command.add_argument("--codex-home", default=str(default_codex_home()))
