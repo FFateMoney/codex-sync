@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>codex-sync · 本地访问</title>
+  <style>
+    :root { color-scheme: dark; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at top, #1f3b5a, #0d1117 46%); }
+    main { width: min(680px, calc(100% - 40px)); padding: 44px; border: 1px solid #30363d; border-radius: 18px; background: #161b22e8; box-shadow: 0 20px 70px #0008; }
+    .eyebrow { color: #58a6ff; font-size: .82rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
+    h1 { font-size: clamp(2rem, 5vw, 3.25rem); margin: .35rem 0 1rem; letter-spacing: -.04em; }
+    p { line-height: 1.65; color: #b1bac4; }
+    button { margin: 1.2rem 0; padding: 13px 19px; border: 0; border-radius: 9px; color: #061525; background: #58a6ff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    button:hover { background: #79c0ff; }
+    .status { padding: 16px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; white-space: pre-line; }
+    .path-help { margin-top: 1.4rem; padding: 16px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; }
+    .path-help p { margin: 0 0 .65rem; }
+    .path-help p:last-child { margin-bottom: 0; }
+    .command { display: flex; align-items: center; gap: .7rem; padding: .7rem .8rem; border-radius: 7px; background: #010409; }
+    .command code { overflow-x: auto; white-space: nowrap; flex: 1; }
+    .copy { margin: 0; padding: .45rem .65rem; font-size: .82rem; white-space: nowrap; background: #21262d; color: #e6edf3; }
+    .copy:hover { background: #30363d; }
+    .ok { border-color: #238636; color: #7ee787; }
+    .warning { border-color: #9e6a03; color: #e3b341; }
+    code { color: #79c0ff; }
+    input { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">codex-sync · step 1</div>
+    <h1>授权本机 Codex 文件夹</h1>
+    <p>点击后，请在系统选择器中选择 <code>.codex</code> 文件夹。网页只会在你选择后读取该目录；本页不会上传任何文件。</p>
+    <button id="grant">选择 .codex 文件夹</button>
+    <input id="fallback" type="file" webkitdirectory multiple>
+    <div id="status" class="status">尚未授权本地文件夹。</div>
+    <section class="path-help" aria-label="本机 Codex 文件夹位置">
+      <p><strong>常用位置</strong>：macOS / Linux 通常为 <code>~/.codex</code>。如果你设置过 <code>CODEX_HOME</code>，请以它为准。</p>
+      <div class="command">
+        <code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code>
+        <button class="copy" id="copy-command" type="button">复制命令</button>
+      </div>
+      <p>在终端运行此命令会显示应在文件选择器中打开的目录。macOS 中按 <code>⌘⇧G</code> 可直接前往该位置；若看不到隐藏文件，按 <code>⌘⇧.</code>。</p>
+    </section>
+    <p>推荐 Chrome 或 Edge。首次使用时可能需要在文件选择器中显示隐藏文件（macOS：<code>⌘⇧.</code>）。</p>
+  </main>
+  <script>
+    const status = document.querySelector('#status');
+    const fallback = document.querySelector('#fallback');
+    const copyCommand = document.querySelector('#copy-command');
+    const say = (message, kind = '') => { status.textContent = message; status.className = `status ${kind}`; };
+    async function inspectDirectory(directory) {
+      let sessions = 0, foundDb = false;
+      async function walk(handle, inSessions = false) {
+        for await (const [name, child] of handle.entries()) {
+          if (child.kind === 'file') {
+            if (name === 'state_5.sqlite') foundDb = true;
+            if (inSessions && name.endsWith('.jsonl')) sessions++;
+          } else if (child.kind === 'directory') {
+            await walk(child, inSessions || name === 'sessions');
+          }
+        }
+      }
+      await walk(directory);
+      say(`已授权：${directory.name}\n检测到 ${sessions} 个会话档案${foundDb ? '，并找到线程标题索引。' : '，但未找到 state_5.sqlite。'}\n尚未上传任何内容。`, 'ok');
+    }
+    document.querySelector('#grant').addEventListener('click', async () => {
+      try {
+        if ('showDirectoryPicker' in window) {
+          const directory = await window.showDirectoryPicker({ mode: 'read' });
+          await inspectDirectory(directory);
+        } else {
+          fallback.click();
+        }
+      } catch (error) {
+        say(`未授予访问权限：${error.message}`, 'warning');
+      }
+    });
+    fallback.addEventListener('change', () => {
+      const files = [...fallback.files];
+      const sessions = files.filter(file => file.webkitRelativePath.includes('/sessions/') && file.name.endsWith('.jsonl')).length;
+      const foundDb = files.some(file => file.name === 'state_5.sqlite');
+      say(`已通过兼容模式选择目录。\n检测到 ${sessions} 个会话档案${foundDb ? '，并找到线程标题索引。' : '。'}\n刷新页面后需要重新选择；尚未上传任何内容。`, 'ok');
+    });
+    copyCommand.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(document.querySelector('#path-command').textContent);
+        copyCommand.textContent = '已复制';
+        setTimeout(() => { copyCommand.textContent = '复制命令'; }, 1600);
+      } catch {
+        say('无法自动复制，请手动复制上方命令。', 'warning');
+      }
+    });
+  </script>
+</body>
+</html>

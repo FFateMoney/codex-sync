@@ -10,6 +10,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import re
+import ssl
 import tempfile
 from urllib.parse import unquote, urlsplit
 
@@ -21,6 +22,7 @@ CHUNK_SIZE = 1024 * 1024
 class PackageHandler(BaseHTTPRequestHandler):
     storage_root: Path
     maximum_bytes: int
+    web_root: Path
 
     def log_message(self, format: str, *args: object) -> None:
         print(f"{self.address_string()} {format % args}")
@@ -33,6 +35,16 @@ class PackageHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
+    def serve_index(self) -> None:
+        index = self.web_root / "index.html"
+        content = index.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(content)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(content)
+
     def package_path(self) -> Path | None:
         parts = [unquote(part) for part in urlsplit(self.path).path.split("/") if part]
         if len(parts) != 7 or parts[0] != "v1" or parts[1] != "accounts" or parts[3] != "tags" or parts[5] != "packages":
@@ -43,7 +55,11 @@ class PackageHandler(BaseHTTPRequestHandler):
         return self.storage_root / "accounts" / account / "tags" / tag / "packages" / package_id
 
     def do_GET(self) -> None:
-        if self.path == "/healthz":
+        path = urlsplit(self.path).path
+        if path in ("/", "/index.html"):
+            self.serve_index()
+            return
+        if path == "/healthz":
             self.reply_json(HTTPStatus.OK, {"status": "ok"})
             return
         package = self.package_path()
@@ -117,11 +133,22 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8089)
     parser.add_argument("--root", required=True, help="directory containing account/tag package folders")
     parser.add_argument("--max-bytes", type=int, default=1024 * 1024 * 1024)
+    parser.add_argument("--certfile", help="PEM TLS certificate; required with --keyfile")
+    parser.add_argument("--keyfile", help="PEM TLS private key; required with --certfile")
     args = parser.parse_args()
     PackageHandler.storage_root = Path(args.root).resolve()
     PackageHandler.maximum_bytes = args.max_bytes
+    PackageHandler.web_root = Path(__file__).resolve().parent / "web"
     server = ThreadingHTTPServer((args.bind, args.port), PackageHandler)
-    print(f"listening on http://{args.bind}:{args.port}; storage={PackageHandler.storage_root}")
+    protocol = "http"
+    if bool(args.certfile) != bool(args.keyfile):
+        parser.error("--certfile and --keyfile must be supplied together")
+    if args.certfile:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(args.certfile, args.keyfile)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        protocol = "https"
+    print(f"listening on {protocol}://{args.bind}:{args.port}; storage={PackageHandler.storage_root}")
     server.serve_forever()
 
 
