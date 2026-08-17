@@ -9,6 +9,22 @@ It does not parse conversation content. On restore it inserts the saved
 registration row into `state_5.sqlite` and rewrites only `rollout_path` for the
 target machine. It creates a SQLite backup before any registration write.
 
+## Install
+
+Install from GitHub with `pipx` (macOS, Linux, and Windows after Python and
+pipx are available):
+
+```sh
+pipx install git+https://github.com/FFateMoney/codex-sync.git
+codex-sync --help
+```
+
+For development from a local checkout:
+
+```sh
+pipx install .
+```
+
 ## Commands
 
 The CLI stores only a server session token in `~/.codex-sync/sessions.json`
@@ -16,25 +32,25 @@ with mode `0600`; it never saves the password.
 
 ```sh
 # The current proof server uses a self-signed HTTPS certificate.
-python3 codex_sync.py login --insecure --url https://sync.example.com --account demo
+codex-sync login --insecure --url https://sync.example.com --account demo
 
-python3 codex_sync.py list --url https://sync.example.com --account demo --tag mac
+codex-sync list --url https://sync.example.com --account demo --tag mac
 
-python3 codex_sync.py push --url https://sync.example.com --account demo --tag mac \
+codex-sync push --url https://sync.example.com --account demo --tag mac \
   --session ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl
 
 # Download only: this does not touch local Codex state.
-python3 codex_sync.py download --url https://sync.example.com --account demo --tag mac \
+codex-sync download --url https://sync.example.com --account demo --tag mac \
   --package-id <package-id> --output ~/Downloads/thread.tar.gz
 
 # Load an existing local package into Codex.
-python3 codex_sync.py load --package ~/Downloads/thread.tar.gz --codex-home ~/.codex
+codex-sync load --package ~/Downloads/thread.tar.gz --codex-home ~/.codex
 
 # Download and load in one command.
-python3 codex_sync.py pull --url https://sync.example.com --account demo --tag mac \
+codex-sync pull --url https://sync.example.com --account demo --tag mac \
   --package-id <package-id> --codex-home ~/.codex
 
-python3 codex_sync.py logout --url https://sync.example.com --account demo
+codex-sync logout --url https://sync.example.com --account demo
 ```
 
 `push` creates no permanent local package. `download` only writes the requested
