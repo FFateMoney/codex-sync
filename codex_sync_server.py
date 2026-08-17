@@ -17,6 +17,7 @@ import ssl
 import tempfile
 import threading
 import time
+import tarfile
 from urllib.parse import unquote, urlsplit
 
 
@@ -189,6 +190,59 @@ class PackageHandler(BaseHTTPRequestHandler):
             return None
         return self.storage_root / "accounts" / account / "tags" / tag / "packages" / package_id
 
+    def inventory_account(self) -> str | None:
+        parts = [unquote(part) for part in urlsplit(self.path).path.split("/") if part]
+        if len(parts) != 4 or parts[:2] != ["v1", "accounts"] or parts[3] != "packages":
+            return None
+        return parts[2] if IDENTIFIER.fullmatch(parts[2]) else None
+
+    def package_summary(self, package: Path, tag: str) -> dict:
+        summary = {
+            "package_id": package.name,
+            "tag": tag,
+            "bytes": package.stat().st_size,
+            "modified_at": int(package.stat().st_mtime),
+            "valid": False,
+        }
+        try:
+            with tarfile.open(package, "r:gz") as bundle:
+                stream = bundle.extractfile(".codex-sync/manifest.json")
+                if stream is None:
+                    return summary
+                manifest = json.load(stream)
+            registration = manifest.get("thread_registration", {})
+            record = registration.get("record", {})
+            entry = manifest.get("entries", [{}])[0]
+            if not isinstance(record, dict) or not isinstance(entry, dict):
+                return summary
+            title = record.get("title") or record.get("first_user_message") or package.name
+            summary.update(
+                {
+                    "valid": True,
+                    "thread_id": record.get("id"),
+                    "title": title if isinstance(title, str) else package.name,
+                    "updated_at": record.get("updated_at"),
+                    "session_path": entry.get("path"),
+                }
+            )
+        except (OSError, tarfile.TarError, KeyError, TypeError, json.JSONDecodeError):
+            pass
+        return summary
+
+    def reply_inventory(self, account: str) -> None:
+        root = self.storage_root / "accounts" / account / "tags"
+        packages: list[dict] = []
+        if root.is_dir():
+            for tag_directory in root.iterdir():
+                package_directory = tag_directory / "packages"
+                if not IDENTIFIER.fullmatch(tag_directory.name) or not package_directory.is_dir():
+                    continue
+                for package in package_directory.iterdir():
+                    if package.is_file() and IDENTIFIER.fullmatch(package.name):
+                        packages.append(self.package_summary(package, tag_directory.name))
+        packages.sort(key=lambda item: item["modified_at"], reverse=True)
+        self.reply_json(HTTPStatus.OK, {"account": account, "packages": packages})
+
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
         if path in ("/", "/index.html"):
@@ -203,6 +257,16 @@ class PackageHandler(BaseHTTPRequestHandler):
             account = self.authenticated_account()
             if account is not None:
                 self.reply_json(HTTPStatus.OK, {"account": account})
+            return
+        inventory_account = self.inventory_account()
+        if inventory_account is not None:
+            account = self.authenticated_account()
+            if account is None:
+                return
+            if account != inventory_account:
+                self.reply_json(HTTPStatus.FORBIDDEN, {"error": "account does not match authenticated user"})
+                return
+            self.reply_inventory(account)
             return
         package = self.package_path()
         if package is None:
