@@ -211,7 +211,7 @@
       <div class="nav-label">工作区</div>
       <nav class="nav"><button class="nav-item active" type="button"><span class="nav-icon">⌂</span><span class="nav-text">连接本机</span></button></nav>
       <div class="nav-label" style="margin-top:24px">仓库</div>
-      <nav class="nav"><button class="nav-item" type="button" disabled><span class="nav-icon">☁</span><span class="nav-text">云端对话</span><span class="nav-badge">待连接</span></button></nav>
+      <nav class="nav"><button id="grant-cloud-nav" class="nav-item" type="button"><span class="nav-icon">☁</span><span class="nav-text">云端对话</span><span class="nav-badge">可访问</span></button></nav>
       <div class="sidebar-foot"><small>私人同步仓库</small><small>v0.1 · 本地索引</small></div>
     </aside>
     <section class="workspace">
@@ -219,7 +219,7 @@
       <main class="content">
         <div class="page-heading"><div><div class="eyebrow" style="margin-top:0">本地数据源</div><h1>连接 Codex 本机目录</h1><p class="muted">选择文件夹后，控制台将在浏览器中读取线程标题索引。</p></div><div class="sync-note">● 未连接本机目录</div></div>
         <section class="setup-panel">
-          <div class="setup-card"><h2>授权本机 <code>.codex</code> 文件夹</h2><p>你需要在系统文件选择器中明确选择目录。此步骤只读取 <code>state_5.sqlite</code> 以建立本地对话列表，不上传聊天内容。</p><div class="setup-list"><div class="setup-item"><span class="step">1</span><span>在系统选择器中打开你的 Codex 配置目录。</span></div><div class="setup-item"><span class="step">2</span><span>确认授权后读取本地线程标题与会话数量。</span></div><div class="setup-item"><span class="step">3</span><span>进入控制台，筛选和查看本地对话。</span></div></div><button id="grant" class="button" type="button">选择 .codex 文件夹 <span>→</span></button><input id="fallback" type="file" webkitdirectory multiple hidden><div id="grant-status" class="status">尚未授权本地文件夹。</div></div>
+          <div class="setup-card"><h2>授权本机 <code>.codex</code> 文件夹</h2><p>你需要在系统文件选择器中明确选择目录。此步骤只读取 <code>state_5.sqlite</code> 以建立本地对话列表，不上传聊天内容。</p><div class="setup-list"><div class="setup-item"><span class="step">1</span><span>在系统选择器中打开你的 Codex 配置目录。</span></div><div class="setup-item"><span class="step">2</span><span>确认授权后读取本地线程标题与会话数量。</span></div><div class="setup-item"><span class="step">3</span><span>进入控制台，筛选和查看本地对话。</span></div></div><button id="grant" class="button" type="button">选择 .codex 文件夹 <span>→</span></button><button id="grant-cloud" class="button secondary" style="margin-left:8px" type="button">先查看云端对话</button><input id="fallback" type="file" webkitdirectory multiple hidden><div id="grant-status" class="status">本机目录为可选项；云端仓库无需授权本地目录。</div></div>
           <aside class="setup-card"><h2>查找目录</h2><p>macOS / Linux 通常使用以下默认位置。设置过 <code>CODEX_HOME</code> 时请以其为准。</p><div class="path-box"><code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code><button id="copy-command" class="button secondary" type="button">复制</button></div><div class="feature-list"><div class="feature"><strong>macOS 快捷方式</strong>文件选择器按 <code>⌘⇧G</code>，可直接前往目录。</div><div class="feature"><strong>隐藏文件</strong>若未显示 <code>.codex</code>，按 <code>⌘⇧.</code>。</div></div></aside>
         </section>
       </main>
@@ -272,6 +272,7 @@
     let cloudPackages = [];
     let currentAccount = '';
     let sessionFiles = new Map();
+    let localConnected = false;
     let restorePackage;
     let toastTimer;
 
@@ -336,6 +337,7 @@
     }
 
     function showDashboard(account, threads, sessions) {
+      localConnected = true;
       allThreads = threads;
       const active = threads.filter(thread => !thread.archived).length;
       document.querySelector('#account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
@@ -349,6 +351,15 @@
       renderThreads();
       refreshCloud();
       show(dashboardView);
+      switchWorkspace('local');
+    }
+
+    function showCloudDashboard(account) {
+      currentAccount = account;
+      document.querySelector('#account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
+      document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
+      show(dashboardView);
+      switchWorkspace('cloud');
     }
 
     async function readIndex(databaseFile) {
@@ -467,7 +478,7 @@
 
     document.querySelector('#login-form').addEventListener('submit', async event => {
       event.preventDefault(); const username = document.querySelector('#username').value; const password = document.querySelector('#password').value; say(loginStatus, '正在验证账户…');
-      try { await requestJson('/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) }); document.querySelector('#password').value = ''; document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(username)}</i>${username}`; show(grantView); }
+      try { await requestJson('/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) }); document.querySelector('#password').value = ''; const account = await requestJson('/v1/auth/me'); showCloudDashboard(account.account); }
       catch (error) { say(loginStatus, `登录失败：${error.message}`, 'warning'); }
     });
     document.querySelector('#grant').addEventListener('click', async () => {
@@ -482,19 +493,21 @@
       try { await navigator.clipboard.writeText(document.querySelector('#path-command').textContent); showToast('定位命令已复制到剪贴板。'); }
       catch { say(grantStatus, '无法自动复制，请手动复制上方命令。', 'warning'); }
     });
+    document.querySelector('#grant-cloud').addEventListener('click', async () => { const account = await requestJson('/v1/auth/me'); showCloudDashboard(account.account); });
+    document.querySelector('#grant-cloud-nav').addEventListener('click', async () => { const account = await requestJson('/v1/auth/me'); showCloudDashboard(account.account); });
     document.querySelector('#reconnect').addEventListener('click', () => { show(grantView); });
     document.querySelector('#close-detail').addEventListener('click', () => { document.querySelector('#detail').hidden = true; });
     document.querySelector('#close-restore-command').addEventListener('click', () => { document.querySelector('#restore-command').hidden = true; });
     document.querySelector('#restore-codex-home').addEventListener('input', updateRestoreCommand);
     document.querySelector('#copy-restore-cli-command').addEventListener('click', async () => { try { await navigator.clipboard.writeText(document.querySelector('#restore-cli-command-text').textContent); showToast('codex-sync 恢复命令已复制。'); } catch { showToast('无法自动复制，请手动复制命令。'); } });
     document.querySelector('#copy-restore-command').addEventListener('click', async () => { try { await navigator.clipboard.writeText(document.querySelector('#restore-command-text').textContent); showToast('Python 脚本恢复命令已复制。'); } catch { showToast('无法自动复制，请手动复制命令。'); } });
-    document.querySelector('#logout').addEventListener('click', async () => { await requestJson('/v1/auth/logout', { method: 'POST' }); document.querySelector('#detail').hidden = true; show(loginView); say(loginStatus, '已退出登录。'); });
+    document.querySelector('#logout').addEventListener('click', async () => { await requestJson('/v1/auth/logout', { method: 'POST' }); currentAccount = ''; localConnected = false; document.querySelector('#detail').hidden = true; document.querySelector('#restore-command').hidden = true; show(loginView); say(loginStatus, '已退出登录。'); });
     threadSearch.addEventListener('input', renderThreads); threadFilter.addEventListener('change', renderThreads);
-    document.querySelector('#local-nav').addEventListener('click', () => switchWorkspace('local'));
+    document.querySelector('#local-nav').addEventListener('click', () => { if (localConnected) switchWorkspace('local'); else show(grantView); });
     document.querySelector('#cloud-nav').addEventListener('click', () => switchWorkspace('cloud'));
     document.querySelector('#cloud-refresh').addEventListener('click', refreshCloud);
     document.querySelector('#cloud-tag-filter').addEventListener('change', renderCloud);
-    (async () => { try { const account = await requestJson('/v1/auth/me'); document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(account.account)}</i>${account.account}`; show(grantView); } catch { show(loginView); } })();
+    (async () => { try { const account = await requestJson('/v1/auth/me'); showCloudDashboard(account.account); } catch { show(loginView); } })();
   </script>
 </body>
 </html>
