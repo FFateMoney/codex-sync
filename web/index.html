@@ -3,87 +3,177 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>codex-sync</title>
+  <title>codex-sync · 控制台</title>
   <script src="/static/sql-wasm.js"></script>
   <style>
-    :root { color-scheme: dark; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; }
-    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #1f3b5a, #0d1117 48%); }
-    main { width: min(960px, calc(100% - 40px)); margin: 6vh auto; padding: 38px; border: 1px solid #30363d; border-radius: 18px; background: #161b22eb; box-shadow: 0 20px 70px #0008; }
-    .narrow { max-width: 580px; margin: 0 auto; }
-    .eyebrow { color: #58a6ff; font-size: .82rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
-    h1 { font-size: clamp(2rem, 5vw, 3.1rem); margin: .35rem 0 1rem; letter-spacing: -.04em; }
-    h2 { margin: 0; font-size: 1.25rem; }
-    p, .muted { line-height: 1.65; color: #b1bac4; }
-    form { display: grid; gap: .8rem; margin-top: 1.4rem; }
-    label { color: #b1bac4; font-size: .88rem; }
-    input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; background: #0d1117; font: inherit; }
-    button { padding: 12px 17px; border: 0; border-radius: 9px; color: #061525; background: #58a6ff; font: inherit; font-weight: 700; cursor: pointer; }
-    button:hover { background: #79c0ff; }
-    button.secondary { color: #e6edf3; background: #21262d; }
-    button.secondary:hover { background: #30363d; }
-    .status, .path-help { margin-top: 1.2rem; padding: 14px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; white-space: pre-line; }
-    .warning { border-color: #9e6a03; color: #e3b341; }
-    .ok { border-color: #238636; color: #7ee787; }
-    .row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
-    .stack { display: grid; gap: 16px; }
-    .command { display: flex; align-items: center; gap: .7rem; padding: .7rem .8rem; border-radius: 7px; background: #010409; }
-    .command code { overflow-x: auto; white-space: nowrap; flex: 1; color: #79c0ff; }
-    .copy { margin: 0; padding: .45rem .65rem; font-size: .82rem; white-space: nowrap; }
-    .account { font-size: .9rem; color: #7ee787; }
-    .list-header { margin-top: 2rem; }
-    .count { color: #8b949e; font-size: .9rem; }
-    .threads { margin-top: 1rem; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
-    .thread { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 18px; padding: 14px 16px; border-bottom: 1px solid #30363d; }
-    .thread:last-child { border-bottom: 0; }
-    .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
-    .details { color: #8b949e; font-size: .82rem; }
-    .archived { color: #d29922; font-size: .78rem; }
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #090d14; color: #edf2f7; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; background: #090d14; }
+    button, input, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
     [hidden] { display: none !important; }
-    @media (max-width: 620px) { main { width: calc(100% - 28px); margin: 14px auto; padding: 24px; } .row { align-items: flex-start; flex-direction: column; } .thread { grid-template-columns: 1fr; } }
+    .auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(900px 520px at 20% 0%, #123154 0%, transparent 68%), radial-gradient(760px 520px at 100% 100%, #0e2a42 0%, transparent 70%), #090d14; }
+    .auth-card { width: min(440px, 100%); padding: 34px; border: 1px solid #263344; border-radius: 16px; background: #111923e8; box-shadow: 0 28px 90px #0009; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; letter-spacing: -.02em; }
+    .brand-mark { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; color: #07202b; background: linear-gradient(135deg, #67e8f9, #60a5fa); font-size: .88rem; box-shadow: 0 0 22px #22d3ee44; }
+    .eyebrow { margin-top: 34px; color: #67e8f9; font-size: .72rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 8px 0 10px; font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing: -.045em; line-height: 1.12; }
+    h2 { margin: 0; font-size: 1rem; letter-spacing: -.015em; }
+    .muted { color: #8fa0b5; line-height: 1.65; }
+    .auth-card p { margin: 0; }
+    form { display: grid; gap: 14px; margin-top: 28px; }
+    label { display: grid; gap: 7px; color: #aab8c8; font-size: .83rem; font-weight: 600; }
+    input, select { width: 100%; min-width: 0; padding: 11px 12px; color: #e9f0f8; border: 1px solid #2b394b; border-radius: 8px; background: #0a1018; }
+    input::placeholder { color: #607188; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 8px; color: #071118; background: #67e8f9; font-size: .9rem; font-weight: 750; }
+    .button:hover { background: #a5f3fc; }
+    .button.secondary { color: #cbd8e5; border: 1px solid #304055; background: #17212d; }
+    .button.secondary:hover { color: #fff; background: #213044; }
+    .button.ghost { color: #9eb0c5; background: transparent; }
+    .button.ghost:hover { color: #f3f8fc; background: #1a2634; }
+    .wide { width: 100%; }
+    .status { margin-top: 18px; padding: 11px 12px; border: 1px solid #2b394b; border-radius: 8px; color: #91a2b6; background: #0b121b; white-space: pre-line; font-size: .86rem; }
+    .status.warning { border-color: #805b21; color: #f8cc7b; }
+    .status.ok { border-color: #21654f; color: #7ce3bd; }
+
+    .app { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr); background: #0b1119; }
+    .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 12px; border-right: 1px solid #223041; background: #0d141e; }
+    .sidebar .brand { padding: 0 10px 28px; }
+    .nav-label { padding: 0 10px 8px; color: #5f7187; font-size: .68rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .nav { display: grid; gap: 4px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border-radius: 7px; color: #91a3b8; background: transparent; text-align: left; font-size: .9rem; }
+    .nav-item:hover { color: #e7f0f8; background: #172331; }
+    .nav-item.active { color: #eafdff; background: #123244; box-shadow: inset 2px 0 #67e8f9; }
+    .nav-item[disabled] { cursor: not-allowed; opacity: .48; }
+    .nav-icon { width: 18px; text-align: center; color: #72dff0; font-size: .95rem; }
+    .nav-badge { margin-left: auto; padding: 2px 6px; border: 1px solid #405065; border-radius: 999px; color: #8fa0b5; font-size: .67rem; }
+    .sidebar-foot { display: grid; gap: 8px; margin-top: auto; padding: 16px 10px 0; border-top: 1px solid #223041; }
+    .sidebar-foot small { color: #62758b; font-size: .72rem; }
+    .workspace { min-width: 0; }
+    .topbar { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; min-height: 68px; padding: 0 34px; border-bottom: 1px solid #223041; background: #0d141ef5; backdrop-filter: blur(12px); }
+    .crumb { color: #8b9bb0; font-size: .86rem; }
+    .crumb strong { color: #edf4fa; font-weight: 650; }
+    .top-actions { display: flex; align-items: center; gap: 14px; }
+    .system-state { display: flex; align-items: center; gap: 7px; color: #83d9b8; font-size: .78rem; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 4px #34d3991c; }
+    .account-chip { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 5px; border: 1px solid #2a3a4d; border-radius: 999px; color: #bfccda; font-size: .8rem; }
+    .avatar { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #071118; background: #75e3f1; font-size: .7rem; font-weight: 800; }
+    .content { max-width: 1440px; margin: 0 auto; padding: 34px; }
+    .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    .page-heading h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.25rem); }
+    .page-heading .muted { margin: 7px 0 0; font-size: .9rem; }
+    .sync-note { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid #254759; border-radius: 7px; color: #8ad9e8; background: #102531; white-space: nowrap; font-size: .78rem; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat { min-height: 112px; padding: 16px; border: 1px solid #243245; border-radius: 10px; background: linear-gradient(150deg, #121d29, #101720); }
+    .stat-label { color: #8495aa; font-size: .77rem; }
+    .stat-value { margin-top: 14px; color: #eff7fb; font-size: 1.65rem; font-weight: 720; letter-spacing: -.04em; }
+    .stat-detail { margin-top: 5px; color: #66869a; font-size: .75rem; }
+    .table-card { overflow: hidden; border: 1px solid #243245; border-radius: 10px; background: #111923; }
+    .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border-bottom: 1px solid #253447; }
+    .toolbar-title { display: flex; align-items: baseline; gap: 9px; }
+    .toolbar-title span { color: #718399; font-size: .78rem; }
+    .filters { display: flex; align-items: center; gap: 8px; }
+    .search { width: 240px; padding: 8px 10px; font-size: .82rem; }
+    select { width: auto; padding: 8px 28px 8px 10px; color: #b8c6d5; font-size: .82rem; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 730px; border-collapse: collapse; text-align: left; }
+    th { padding: 11px 16px; color: #697c91; border-bottom: 1px solid #253447; background: #0f1721; font-size: .7rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    td { padding: 14px 16px; border-bottom: 1px solid #1e2b3b; color: #b9c7d5; font-size: .84rem; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr { transition: background .14s ease; }
+    tbody tr:hover { background: #162433; }
+    .thread-title { max-width: 430px; overflow: hidden; color: #eef5fa; text-overflow: ellipsis; white-space: nowrap; font-weight: 630; }
+    .thread-id { margin-top: 4px; color: #668096; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .69rem; }
+    .tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #30455a; border-radius: 5px; color: #9ec9d7; background: #152838; font-size: .72rem; }
+    .tag.archived { color: #f0c679; border-color: #624d26; background: #2c2517; }
+    .tag.local::before { width: 5px; height: 5px; border-radius: 50%; background: #67e8f9; content: ''; }
+    .row-action { padding: 6px 9px; border: 1px solid #2e4357; border-radius: 6px; color: #a9d6e2; background: transparent; font-size: .76rem; }
+    .row-action:hover { color: #071118; border-color: #8aeaf7; background: #8aeaf7; }
+    .empty { padding: 46px 20px; color: #73869a; text-align: center; }
+    .setup-panel { display: grid; grid-template-columns: 1.35fr .9fr; gap: 18px; }
+    .setup-card { padding: 24px; border: 1px solid #27394d; border-radius: 10px; background: #121d29; }
+    .setup-card h2 { font-size: 1.13rem; }
+    .setup-card p { color: #8fa0b5; line-height: 1.7; font-size: .88rem; }
+    .path-box { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 9px 10px; border: 1px solid #263b4f; border-radius: 7px; background: #0a1119; }
+    .path-box code { overflow: auto; color: #87dbea; white-space: nowrap; font-size: .77rem; }
+    .setup-list { display: grid; gap: 13px; margin: 20px 0; }
+    .setup-item { display: grid; grid-template-columns: 23px 1fr; gap: 10px; color: #a9b8c7; font-size: .84rem; line-height: 1.5; }
+    .step { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: #8aeaf7; border: 1px solid #37627a; background: #102737; font-size: .7rem; }
+    .feature-list { display: grid; gap: 11px; margin-top: 18px; }
+    .feature { padding: 11px; border-radius: 7px; color: #7f93a8; background: #0d151f; font-size: .8rem; }
+    .feature strong { display: block; margin-bottom: 3px; color: #b8c8d7; font-size: .82rem; }
+    .toast { position: fixed; z-index: 5; right: 24px; bottom: 24px; max-width: 320px; padding: 12px 14px; border: 1px solid #335069; border-radius: 8px; color: #c9eafa; background: #132433; box-shadow: 0 16px 45px #0008; font-size: .84rem; }
+    .detail { position: fixed; z-index: 4; top: 0; right: 0; width: min(390px, 100%); height: 100vh; padding: 24px; border-left: 1px solid #2c4055; background: #101923; box-shadow: -16px 0 50px #0007; }
+    .detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .detail-title { margin: 26px 0 10px; color: #eef7fb; font-size: 1.25rem; line-height: 1.35; }
+    .detail-grid { display: grid; gap: 14px; margin-top: 28px; }
+    .detail-grid div { display: grid; gap: 4px; padding-bottom: 13px; border-bottom: 1px solid #243346; }
+    .detail-grid small { color: #71869d; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+    .detail-grid span { overflow-wrap: anywhere; color: #bac9d7; font-size: .83rem; }
+    @media (max-width: 920px) { .app { grid-template-columns: 68px minmax(0, 1fr); } .sidebar { padding: 20px 8px; } .sidebar .brand span, .nav-label, .nav-item .nav-text, .nav-badge, .sidebar-foot { display: none; } .sidebar .brand { justify-content: center; padding: 0 0 28px; } .nav-item { justify-content: center; padding: 11px; } .topbar, .content { padding-left: 24px; padding-right: 24px; } .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .setup-panel { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { .topbar { min-height: 58px; padding: 0 14px; } .crumb { display: none; } .content { padding: 24px 14px; } .page-heading { align-items: flex-start; flex-direction: column; margin-bottom: 20px; } .stats { grid-template-columns: 1fr 1fr; gap: 9px; } .stat { min-height: 96px; padding: 13px; } .stat-value { margin-top: 10px; font-size: 1.35rem; } .table-toolbar { align-items: stretch; flex-direction: column; } .filters, .search { width: 100%; } .filters { display: grid; grid-template-columns: 1fr 1fr; } .search { grid-column: 1 / -1; } .account-chip { display: none; } }
   </style>
 </head>
 <body>
-  <main>
-    <section id="login-view" class="narrow">
-      <div class="eyebrow">codex-sync</div>
-      <h1>登录你的同步仓库</h1>
-      <p>此服务当前只允许已开通的账户登录，不提供注册入口。</p>
+  <section id="login-view" class="auth-page">
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark">↗</span><span>codex-sync</span></div>
+      <div class="eyebrow">Private sync console</div>
+      <h1>登录同步控制台</h1>
+      <p class="muted">使用已开通账户访问你的私有对话仓库。本服务不提供注册入口。</p>
       <form id="login-form">
         <label>账户名 <input id="username" name="username" value="jasper" autocomplete="username" required></label>
         <label>密码 <input id="password" name="password" type="password" autocomplete="current-password" required></label>
-        <button type="submit">登录</button>
+        <button class="button wide" type="submit">登录控制台 <span>→</span></button>
       </form>
-      <div id="login-status" class="status">请使用已开通的账户登录。</div>
-    </section>
+      <div id="login-status" class="status">等待账户认证。</div>
+    </div>
+  </section>
 
-    <section id="grant-view" class="narrow" hidden>
-      <div class="eyebrow">已登录</div>
-      <h1>授权本机 Codex 文件夹</h1>
-      <p>登录后仍须由你手动选择本机 <code>.codex</code> 文件夹。网页仅读取标题索引以显示列表；不会上传聊天内容。</p>
-      <button id="grant" type="button">选择 .codex 文件夹</button>
-      <input id="fallback" type="file" webkitdirectory multiple hidden>
-      <div id="grant-status" class="status">尚未授权本地文件夹。</div>
-      <section class="path-help" aria-label="本机 Codex 文件夹位置">
-        <p><strong>常用位置</strong>：macOS / Linux 通常为 <code>~/.codex</code>。若设置了 <code>CODEX_HOME</code>，请以它为准。</p>
-        <div class="command">
-          <code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code>
-          <button class="secondary copy" id="copy-command" type="button">复制命令</button>
-        </div>
-        <p>macOS 文件选择器按 <code>⌘⇧G</code> 可直接前往该位置；若看不到隐藏文件，按 <code>⌘⇧.</code>。</p>
-      </section>
+  <section id="grant-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">↗</span><span>codex-sync</span></div>
+      <div class="nav-label">工作区</div>
+      <nav class="nav"><button class="nav-item active" type="button"><span class="nav-icon">⌂</span><span class="nav-text">连接本机</span></button></nav>
+      <div class="nav-label" style="margin-top:24px">仓库</div>
+      <nav class="nav"><button class="nav-item" type="button" disabled><span class="nav-icon">☁</span><span class="nav-text">云端对话</span><span class="nav-badge">待连接</span></button></nav>
+      <div class="sidebar-foot"><small>私人同步仓库</small><small>v0.1 · 本地索引</small></div>
+    </aside>
+    <section class="workspace">
+      <header class="topbar"><div class="crumb">工作区 / <strong>连接本机</strong></div><div class="top-actions"><span class="system-state"><i class="dot"></i>服务正常</span><span id="grant-account" class="account-chip"><i class="avatar">J</i>jasper</span></div></header>
+      <main class="content">
+        <div class="page-heading"><div><div class="eyebrow" style="margin-top:0">本地数据源</div><h1>连接 Codex 本机目录</h1><p class="muted">选择文件夹后，控制台将在浏览器中读取线程标题索引。</p></div><div class="sync-note">● 未连接本机目录</div></div>
+        <section class="setup-panel">
+          <div class="setup-card"><h2>授权本机 <code>.codex</code> 文件夹</h2><p>你需要在系统文件选择器中明确选择目录。此步骤只读取 <code>state_5.sqlite</code> 以建立本地对话列表，不上传聊天内容。</p><div class="setup-list"><div class="setup-item"><span class="step">1</span><span>在系统选择器中打开你的 Codex 配置目录。</span></div><div class="setup-item"><span class="step">2</span><span>确认授权后读取本地线程标题与会话数量。</span></div><div class="setup-item"><span class="step">3</span><span>进入控制台，筛选和查看本地对话。</span></div></div><button id="grant" class="button" type="button">选择 .codex 文件夹 <span>→</span></button><input id="fallback" type="file" webkitdirectory multiple hidden><div id="grant-status" class="status">尚未授权本地文件夹。</div></div>
+          <aside class="setup-card"><h2>查找目录</h2><p>macOS / Linux 通常使用以下默认位置。设置过 <code>CODEX_HOME</code> 时请以其为准。</p><div class="path-box"><code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code><button id="copy-command" class="button secondary" type="button">复制</button></div><div class="feature-list"><div class="feature"><strong>macOS 快捷方式</strong>文件选择器按 <code>⌘⇧G</code>，可直接前往目录。</div><div class="feature"><strong>隐藏文件</strong>若未显示 <code>.codex</code>，按 <code>⌘⇧.</code>。</div></div></aside>
+        </section>
+      </main>
     </section>
+  </section>
 
-    <section id="dashboard-view" hidden>
-      <div class="row">
-        <div><div class="eyebrow">本地 Codex</div><h1>对话列表</h1></div>
-        <div class="stack"><span id="account" class="account"></span><button id="logout" class="secondary" type="button">退出登录</button></div>
-      </div>
-      <p id="summary" class="muted"></p>
-      <div class="row list-header"><h2>所有本地对话</h2><span id="thread-count" class="count"></span></div>
-      <div id="threads" class="threads"></div>
-      <p class="muted">标题来自你授权目录中的 <code>state_5.sqlite</code>；聊天 JSONL 内容未在此步骤读取或上传。</p>
+  <section id="dashboard-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">↗</span><span>codex-sync</span></div>
+      <div class="nav-label">工作区</div>
+      <nav class="nav"><button class="nav-item active" type="button"><span class="nav-icon">▦</span><span class="nav-text">本地对话</span><span id="nav-count" class="nav-badge">0</span></button><button class="nav-item" type="button" disabled><span class="nav-icon">☁</span><span class="nav-text">云端对话</span><span class="nav-badge">待连接</span></button></nav>
+      <div class="nav-label" style="margin-top:24px">管理</div>
+      <nav class="nav"><button id="reconnect" class="nav-item" type="button"><span class="nav-icon">⌁</span><span class="nav-text">重新连接目录</span></button></nav>
+      <div class="sidebar-foot"><small>私人同步仓库</small><small>v0.1 · 本地索引</small></div>
+    </aside>
+    <section class="workspace">
+      <header class="topbar"><div class="crumb">工作区 / <strong>本地对话</strong></div><div class="top-actions"><span class="system-state"><i class="dot"></i>服务正常</span><span id="account" class="account-chip"><i class="avatar">J</i>jasper</span><button id="logout" class="button ghost" type="button">退出</button></div></header>
+      <main class="content">
+        <div class="page-heading"><div><div class="eyebrow" style="margin-top:0">Local index</div><h1>本地对话</h1><p id="summary" class="muted">正在读取本地索引…</p></div><div class="sync-note"><i class="dot"></i> 本地索引已连接</div></div>
+        <section class="stats"><article class="stat"><div class="stat-label">线程记录</div><div id="stat-threads" class="stat-value">0</div><div class="stat-detail">来自 state_5.sqlite</div></article><article class="stat"><div class="stat-label">会话档案</div><div id="stat-sessions" class="stat-value">0</div><div class="stat-detail">sessions/ 中的 JSONL</div></article><article class="stat"><div class="stat-label">活跃对话</div><div id="stat-active" class="stat-value">0</div><div class="stat-detail">未归档线程</div></article><article class="stat"><div class="stat-label">云端仓库</div><div class="stat-value" style="font-size:1.1rem;margin-top:19px">待连接</div><div class="stat-detail">远端列表将在下一阶段接入</div></article></section>
+        <section class="table-card"><div class="table-toolbar"><div class="toolbar-title"><h2>所有本地对话</h2><span id="thread-count">0 条记录</span></div><div class="filters"><input id="thread-search" class="search" type="search" placeholder="搜索标题或线程 ID"><select id="thread-filter" aria-label="筛选对话"><option value="all">全部状态</option><option value="active">仅活跃</option><option value="archived">仅归档</option></select></div></div><div class="table-wrap"><table><thead><tr><th>对话</th><th>更新时间</th><th>来源</th><th>状态</th><th></th></tr></thead><tbody id="threads"></tbody></table><div id="empty" class="empty" hidden>没有符合条件的本地对话。</div></div></section>
+      </main>
     </section>
-  </main>
+  </section>
+
+  <aside id="detail" class="detail" hidden><div class="detail-header"><h2>线程详情</h2><button id="close-detail" class="button ghost" type="button">关闭</button></div><div id="detail-title" class="detail-title"></div><div class="detail-grid"><div><small>线程 ID</small><span id="detail-id"></span></div><div><small>更新时间</small><span id="detail-time"></span></div><div><small>来源</small><span>本机 Codex 索引</span></div><div><small>状态</small><span id="detail-status"></span></div></div><p class="muted" style="margin-top:26px;font-size:.82rem">此视图不读取聊天内容。上传、下载与云端版本将在远端列表完成后提供。</p></aside>
+  <div id="toast" class="toast" hidden></div>
+
   <script>
     const loginView = document.querySelector('#login-view');
     const grantView = document.querySelector('#grant-view');
@@ -91,51 +181,71 @@
     const loginStatus = document.querySelector('#login-status');
     const grantStatus = document.querySelector('#grant-status');
     const fallback = document.querySelector('#fallback');
+    const threadsContainer = document.querySelector('#threads');
+    const threadSearch = document.querySelector('#thread-search');
+    const threadFilter = document.querySelector('#thread-filter');
     const sqlReady = initSqlJs({ locateFile: file => `/static/${file}` });
+    let allThreads = [];
+    let toastTimer;
 
     const say = (element, message, kind = '') => { element.textContent = message; element.className = `status ${kind}`; };
-    const show = (view) => {
-      for (const element of [loginView, grantView, dashboardView]) element.hidden = element !== view;
-    };
-    const requestJson = async (path, options = {}) => {
-      const response = await fetch(path, { credentials: 'same-origin', ...options });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(body.error || `请求失败（HTTP ${response.status}）`);
-      return body;
-    };
-    const formatTime = (value) => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(Number(value) * 1000)) : '未知时间';
+    const show = view => { for (const element of [loginView, grantView, dashboardView]) element.hidden = element !== view; };
+    const showToast = message => { const toast = document.querySelector('#toast'); toast.textContent = message; toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.hidden = true; }, 2800); };
+    const requestJson = async (path, options = {}) => { const response = await fetch(path, { credentials: 'same-origin', ...options }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || `请求失败（HTTP ${response.status}）`); return body; };
+    const formatTime = value => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(Number(value) * 1000)) : '未知时间';
+    const initials = account => account.slice(0, 1).toUpperCase();
+
+    function openDetail(thread) {
+      document.querySelector('#detail-title').textContent = thread.title || thread.firstUserMessage || '未命名对话';
+      document.querySelector('#detail-id').textContent = thread.id;
+      document.querySelector('#detail-time').textContent = formatTime(thread.updatedAt);
+      document.querySelector('#detail-status').textContent = thread.archived ? '已归档' : '活跃';
+      document.querySelector('#detail').hidden = false;
+    }
+
+    function renderThreads() {
+      const query = threadSearch.value.trim().toLowerCase();
+      const state = threadFilter.value;
+      const visible = allThreads.filter(thread => {
+        const title = (thread.title || thread.firstUserMessage || '').toLowerCase();
+        const matchesQuery = !query || title.includes(query) || thread.id.toLowerCase().includes(query);
+        const matchesState = state === 'all' || (state === 'archived' ? thread.archived : !thread.archived);
+        return matchesQuery && matchesState;
+      });
+      threadsContainer.replaceChildren();
+      for (const thread of visible) {
+        const row = document.createElement('tr');
+        const titleCell = document.createElement('td');
+        const title = document.createElement('div');
+        title.className = 'thread-title';
+        title.textContent = thread.title || thread.firstUserMessage || '未命名对话';
+        const id = document.createElement('div');
+        id.className = 'thread-id';
+        id.textContent = thread.id;
+        titleCell.append(title, id);
+        const timeCell = document.createElement('td'); timeCell.textContent = formatTime(thread.updatedAt);
+        const originCell = document.createElement('td'); originCell.innerHTML = '<span class="tag local">本机</span>';
+        const stateCell = document.createElement('td'); stateCell.innerHTML = thread.archived ? '<span class="tag archived">已归档</span>' : '<span class="tag">已索引</span>';
+        const actionCell = document.createElement('td');
+        const action = document.createElement('button'); action.className = 'row-action'; action.type = 'button'; action.textContent = '详情'; action.addEventListener('click', () => openDetail(thread)); actionCell.append(action);
+        row.append(titleCell, timeCell, originCell, stateCell, actionCell);
+        threadsContainer.append(row);
+      }
+      document.querySelector('#thread-count').textContent = `${visible.length} / ${allThreads.length} 条记录`;
+      document.querySelector('#empty').hidden = visible.length !== 0;
+    }
 
     function showDashboard(account, threads, sessions) {
-      document.querySelector('#account').textContent = `账户：${account}`;
-      document.querySelector('#summary').textContent = `已读取本机索引，发现 ${threads.length} 条线程记录与 ${sessions} 个会话档案。`;
-      document.querySelector('#thread-count').textContent = `${threads.length} 条`;
-      const container = document.querySelector('#threads');
-      container.replaceChildren();
-      if (!threads.length) {
-        container.textContent = '未找到线程记录。';
-      } else {
-        for (const thread of threads) {
-          const item = document.createElement('div');
-          item.className = 'thread';
-          const title = document.createElement('div');
-          title.className = 'title';
-          title.textContent = thread.title || thread.firstUserMessage || '未命名对话';
-          const date = document.createElement('div');
-          date.className = 'details';
-          date.textContent = formatTime(thread.updatedAt);
-          const details = document.createElement('div');
-          details.className = 'details';
-          details.textContent = thread.id;
-          item.append(title, date, details);
-          if (thread.archived) {
-            const archived = document.createElement('span');
-            archived.className = 'archived';
-            archived.textContent = '已归档';
-            item.append(archived);
-          }
-          container.append(item);
-        }
-      }
+      allThreads = threads;
+      const active = threads.filter(thread => !thread.archived).length;
+      document.querySelector('#account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
+      document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
+      document.querySelector('#summary').textContent = `已连接本机 Codex 索引，共发现 ${threads.length} 条线程记录。`;
+      document.querySelector('#stat-threads').textContent = threads.length;
+      document.querySelector('#stat-sessions').textContent = sessions;
+      document.querySelector('#stat-active').textContent = active;
+      document.querySelector('#nav-count').textContent = threads.length;
+      renderThreads();
       show(dashboardView);
     }
 
@@ -146,26 +256,18 @@
         const result = database.exec('SELECT id, title, first_user_message, updated_at, archived FROM threads ORDER BY recency_at DESC, updated_at DESC');
         const rows = result.length ? result[0].values : [];
         return rows.map(([id, title, firstUserMessage, updatedAt, archived]) => ({ id, title, firstUserMessage, updatedAt, archived: Boolean(archived) }));
-      } finally {
-        database.close();
-      }
+      } finally { database.close(); }
     }
 
     async function inspectDirectory(directory) {
-      let sessions = 0;
-      let databaseFile;
+      let sessions = 0; let databaseFile;
       async function walk(handle, inSessions = false) {
         for await (const [name, child] of handle.entries()) {
-          if (child.kind === 'file') {
-            if (name === 'state_5.sqlite') databaseFile = await child.getFile();
-            if (inSessions && name.endsWith('.jsonl')) sessions++;
-          } else if (child.kind === 'directory') {
-            await walk(child, inSessions || name === 'sessions');
-          }
+          if (child.kind === 'file') { if (name === 'state_5.sqlite') databaseFile = await child.getFile(); if (inSessions && name.endsWith('.jsonl')) sessions++; }
+          else if (child.kind === 'directory') await walk(child, inSessions || name === 'sessions');
         }
       }
-      await walk(directory);
-      return { databaseFile, sessions };
+      await walk(directory); return { databaseFile, sessions };
     }
 
     async function loadAndDisplay(databaseFile, sessions) {
@@ -177,68 +279,27 @@
     }
 
     document.querySelector('#login-form').addEventListener('submit', async event => {
-      event.preventDefault();
-      const username = document.querySelector('#username').value;
-      const password = document.querySelector('#password').value;
-      say(loginStatus, '正在验证账户…');
-      try {
-        await requestJson('/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
-        document.querySelector('#password').value = '';
-        show(grantView);
-      } catch (error) {
-        say(loginStatus, `登录失败：${error.message}`, 'warning');
-      }
+      event.preventDefault(); const username = document.querySelector('#username').value; const password = document.querySelector('#password').value; say(loginStatus, '正在验证账户…');
+      try { await requestJson('/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) }); document.querySelector('#password').value = ''; document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(username)}</i>${username}`; show(grantView); }
+      catch (error) { say(loginStatus, `登录失败：${error.message}`, 'warning'); }
     });
-
     document.querySelector('#grant').addEventListener('click', async () => {
-      try {
-        if ('showDirectoryPicker' in window) {
-          const selection = await window.showDirectoryPicker({ mode: 'read' });
-          const { databaseFile, sessions } = await inspectDirectory(selection);
-          await loadAndDisplay(databaseFile, sessions);
-        } else {
-          fallback.click();
-        }
-      } catch (error) {
-        say(grantStatus, `无法读取目录：${error.message}`, 'warning');
-      }
+      try { if ('showDirectoryPicker' in window) { const selection = await window.showDirectoryPicker({ mode: 'read' }); const { databaseFile, sessions } = await inspectDirectory(selection); await loadAndDisplay(databaseFile, sessions); } else fallback.click(); }
+      catch (error) { say(grantStatus, `无法读取目录：${error.message}`, 'warning'); }
     });
-
     fallback.addEventListener('change', async () => {
-      try {
-        const files = [...fallback.files];
-        const databaseFile = files.find(file => file.name === 'state_5.sqlite');
-        const sessions = files.filter(file => file.webkitRelativePath.includes('/sessions/') && file.name.endsWith('.jsonl')).length;
-        await loadAndDisplay(databaseFile, sessions);
-      } catch (error) {
-        say(grantStatus, `无法读取目录：${error.message}`, 'warning');
-      }
+      try { const files = [...fallback.files]; const databaseFile = files.find(file => file.name === 'state_5.sqlite'); const sessions = files.filter(file => file.webkitRelativePath.includes('/sessions/') && file.name.endsWith('.jsonl')).length; await loadAndDisplay(databaseFile, sessions); }
+      catch (error) { say(grantStatus, `无法读取目录：${error.message}`, 'warning'); }
     });
-
     document.querySelector('#copy-command').addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(document.querySelector('#path-command').textContent);
-        document.querySelector('#copy-command').textContent = '已复制';
-        setTimeout(() => { document.querySelector('#copy-command').textContent = '复制命令'; }, 1600);
-      } catch {
-        say(grantStatus, '无法自动复制，请手动复制上方命令。', 'warning');
-      }
+      try { await navigator.clipboard.writeText(document.querySelector('#path-command').textContent); showToast('定位命令已复制到剪贴板。'); }
+      catch { say(grantStatus, '无法自动复制，请手动复制上方命令。', 'warning'); }
     });
-
-    document.querySelector('#logout').addEventListener('click', async () => {
-      await requestJson('/v1/auth/logout', { method: 'POST' });
-      show(loginView);
-      say(loginStatus, '已退出登录。');
-    });
-
-    (async () => {
-      try {
-        await requestJson('/v1/auth/me');
-        show(grantView);
-      } catch {
-        show(loginView);
-      }
-    })();
+    document.querySelector('#reconnect').addEventListener('click', () => { show(grantView); });
+    document.querySelector('#close-detail').addEventListener('click', () => { document.querySelector('#detail').hidden = true; });
+    document.querySelector('#logout').addEventListener('click', async () => { await requestJson('/v1/auth/logout', { method: 'POST' }); document.querySelector('#detail').hidden = true; show(loginView); say(loginStatus, '已退出登录。'); });
+    threadSearch.addEventListener('input', renderThreads); threadFilter.addEventListener('change', renderThreads);
+    (async () => { try { const account = await requestJson('/v1/auth/me'); document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(account.account)}</i>${account.account}`; show(grantView); } catch { show(loginView); } })();
   </script>
 </body>
 </html>
