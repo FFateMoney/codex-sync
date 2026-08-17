@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>codex-sync · 控制台</title>
+  <script src="/static/sql-wasm.js"></script>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #090d14; color: #edf2f7; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; background: #090d14; }
+    button, input, select { font: inherit; }
+    button { border: 0; cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #67e8f9; outline-offset: 2px; }
+    [hidden] { display: none !important; }
+    .auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(900px 520px at 20% 0%, #123154 0%, transparent 68%), radial-gradient(760px 520px at 100% 100%, #0e2a42 0%, transparent 70%), #090d14; }
+    .auth-card { width: min(440px, 100%); padding: 34px; border: 1px solid #263344; border-radius: 16px; background: #111923e8; box-shadow: 0 28px 90px #0009; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 750; letter-spacing: -.02em; }
+    .brand-mark { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; color: #07202b; background: linear-gradient(135deg, #67e8f9, #60a5fa); font-size: .88rem; box-shadow: 0 0 22px #22d3ee44; }
+    .eyebrow { margin-top: 34px; color: #67e8f9; font-size: .72rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 8px 0 10px; font-size: clamp(1.9rem, 5vw, 2.6rem); letter-spacing: -.045em; line-height: 1.12; }
+    h2 { margin: 0; font-size: 1rem; letter-spacing: -.015em; }
+    .muted { color: #8fa0b5; line-height: 1.65; }
+    .auth-card p { margin: 0; }
+    form { display: grid; gap: 14px; margin-top: 28px; }
+    label { display: grid; gap: 7px; color: #aab8c8; font-size: .83rem; font-weight: 600; }
+    input, select { width: 100%; min-width: 0; padding: 11px 12px; color: #e9f0f8; border: 1px solid #2b394b; border-radius: 8px; background: #0a1018; }
+    input::placeholder { color: #607188; }
+    .button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 14px; border-radius: 8px; color: #071118; background: #67e8f9; font-size: .9rem; font-weight: 750; }
+    .button:hover { background: #a5f3fc; }
+    .button.secondary { color: #cbd8e5; border: 1px solid #304055; background: #17212d; }
+    .button.secondary:hover { color: #fff; background: #213044; }
+    .button.ghost { color: #9eb0c5; background: transparent; }
+    .button.ghost:hover { color: #f3f8fc; background: #1a2634; }
+    .wide { width: 100%; }
+    .status { margin-top: 18px; padding: 11px 12px; border: 1px solid #2b394b; border-radius: 8px; color: #91a2b6; background: #0b121b; white-space: pre-line; font-size: .86rem; }
+    .status.warning { border-color: #805b21; color: #f8cc7b; }
+    .status.ok { border-color: #21654f; color: #7ce3bd; }
+
+    .app { min-height: 100vh; display: grid; grid-template-columns: 240px minmax(0, 1fr); background: #0b1119; }
+    .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 12px; border-right: 1px solid #223041; background: #0d141e; }
+    .sidebar .brand { padding: 0 10px 28px; }
+    .nav-label { padding: 0 10px 8px; color: #5f7187; font-size: .68rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+    .nav { display: grid; gap: 4px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border-radius: 7px; color: #91a3b8; background: transparent; text-align: left; font-size: .9rem; }
+    .nav-item:hover { color: #e7f0f8; background: #172331; }
+    .nav-item.active { color: #eafdff; background: #123244; box-shadow: inset 2px 0 #67e8f9; }
+    .nav-item[disabled] { cursor: not-allowed; opacity: .48; }
+    .nav-icon { width: 18px; text-align: center; color: #72dff0; font-size: .95rem; }
+    .nav-badge { margin-left: auto; padding: 2px 6px; border: 1px solid #405065; border-radius: 999px; color: #8fa0b5; font-size: .67rem; }
+    .sidebar-foot { display: grid; gap: 8px; margin-top: auto; padding: 16px 10px 0; border-top: 1px solid #223041; }
+    .sidebar-foot small { color: #62758b; font-size: .72rem; }
+    .workspace { min-width: 0; }
+    .topbar { position: sticky; z-index: 2; top: 0; display: flex; align-items: center; justify-content: space-between; min-height: 68px; padding: 0 34px; border-bottom: 1px solid #223041; background: #0d141ef5; backdrop-filter: blur(12px); }
+    .crumb { color: #8b9bb0; font-size: .86rem; }
+    .crumb strong { color: #edf4fa; font-weight: 650; }
+    .top-actions { display: flex; align-items: center; gap: 14px; }
+    .system-state { display: flex; align-items: center; gap: 7px; color: #83d9b8; font-size: .78rem; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 4px #34d3991c; }
+    .account-chip { display: flex; align-items: center; gap: 8px; padding: 5px 8px 5px 5px; border: 1px solid #2a3a4d; border-radius: 999px; color: #bfccda; font-size: .8rem; }
+    .avatar { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; color: #071118; background: #75e3f1; font-size: .7rem; font-weight: 800; }
+    .content { max-width: 1440px; margin: 0 auto; padding: 34px; }
+    .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px; }
+    .page-heading h1 { margin: 0; font-size: clamp(1.65rem, 3vw, 2.25rem); }
+    .page-heading .muted { margin: 7px 0 0; font-size: .9rem; }
+    .sync-note { display: flex; align-items: center; gap: 8px; padding: 9px 11px; border: 1px solid #254759; border-radius: 7px; color: #8ad9e8; background: #102531; white-space: nowrap; font-size: .78rem; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .stat { min-height: 112px; padding: 16px; border: 1px solid #243245; border-radius: 10px; background: linear-gradient(150deg, #121d29, #101720); }
+    .stat-label { color: #8495aa; font-size: .77rem; }
+    .stat-value { margin-top: 14px; color: #eff7fb; font-size: 1.65rem; font-weight: 720; letter-spacing: -.04em; }
+    .stat-detail { margin-top: 5px; color: #66869a; font-size: .75rem; }
+    .table-card { overflow: hidden; border: 1px solid #243245; border-radius: 10px; background: #111923; }
+    .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 14px 16px; border-bottom: 1px solid #253447; }
+    .toolbar-title { display: flex; align-items: baseline; gap: 9px; }
+    .toolbar-title span { color: #718399; font-size: .78rem; }
+    .filters { display: flex; align-items: center; gap: 8px; }
+    .search { width: 240px; padding: 8px 10px; font-size: .82rem; }
+    select { width: auto; padding: 8px 28px 8px 10px; color: #b8c6d5; font-size: .82rem; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; min-width: 730px; border-collapse: collapse; text-align: left; }
+    th { padding: 11px 16px; color: #697c91; border-bottom: 1px solid #253447; background: #0f1721; font-size: .7rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+    td { padding: 14px 16px; border-bottom: 1px solid #1e2b3b; color: #b9c7d5; font-size: .84rem; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    tbody tr { transition: background .14s ease; }
+    tbody tr:hover { background: #162433; }
+    .thread-title { max-width: 430px; overflow: hidden; color: #eef5fa; text-overflow: ellipsis; white-space: nowrap; font-weight: 630; }
+    .thread-id { margin-top: 4px; color: #668096; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .69rem; }
+    .tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border: 1px solid #30455a; border-radius: 5px; color: #9ec9d7; background: #152838; font-size: .72rem; }
+    .tag.archived { color: #f0c679; border-color: #624d26; background: #2c2517; }
+    .tag.local::before { width: 5px; height: 5px; border-radius: 50%; background: #67e8f9; content: ''; }
+    .row-action { padding: 6px 9px; border: 1px solid #2e4357; border-radius: 6px; color: #a9d6e2; background: transparent; font-size: .76rem; }
+    .action-group { display: flex; justify-content: flex-end; gap: 7px; }
+    .tag-field { width: 116px; padding: 8px 9px; font-size: .8rem; }
+    .row-action:hover { color: #071118; border-color: #8aeaf7; background: #8aeaf7; }
+    .empty { padding: 46px 20px; color: #73869a; text-align: center; }
+    .setup-panel { display: grid; grid-template-columns: 1.35fr .9fr; gap: 18px; }
+    .setup-card { padding: 24px; border: 1px solid #27394d; border-radius: 10px; background: #121d29; }
+    .setup-card h2 { font-size: 1.13rem; }
+    .setup-card p { color: #8fa0b5; line-height: 1.7; font-size: .88rem; }
+    .path-box { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; padding: 9px 10px; border: 1px solid #263b4f; border-radius: 7px; background: #0a1119; }
+    .path-box code { overflow: auto; color: #87dbea; white-space: nowrap; font-size: .77rem; }
+    .setup-list { display: grid; gap: 13px; margin: 20px 0; }
+    .setup-item { display: grid; grid-template-columns: 23px 1fr; gap: 10px; color: #a9b8c7; font-size: .84rem; line-height: 1.5; }
+    .step { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; color: #8aeaf7; border: 1px solid #37627a; background: #102737; font-size: .7rem; }
+    .feature-list { display: grid; gap: 11px; margin-top: 18px; }
+    .feature { padding: 11px; border-radius: 7px; color: #7f93a8; background: #0d151f; font-size: .8rem; }
+    .feature strong { display: block; margin-bottom: 3px; color: #b8c8d7; font-size: .82rem; }
+    .toast { position: fixed; z-index: 5; right: 24px; bottom: 24px; max-width: 320px; padding: 12px 14px; border: 1px solid #335069; border-radius: 8px; color: #c9eafa; background: #132433; box-shadow: 0 16px 45px #0008; font-size: .84rem; }
+    .detail { position: fixed; z-index: 4; top: 0; right: 0; width: min(390px, 100%); height: 100vh; padding: 24px; border-left: 1px solid #2c4055; background: #101923; box-shadow: -16px 0 50px #0007; }
+    .detail-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .detail-title { margin: 26px 0 10px; color: #eef7fb; font-size: 1.25rem; line-height: 1.35; }
+    .detail-grid { display: grid; gap: 14px; margin-top: 28px; }
+    .detail-grid div { display: grid; gap: 4px; padding-bottom: 13px; border-bottom: 1px solid #243346; }
+    .detail-grid small { color: #71869d; font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; }
+    .detail-grid span { overflow-wrap: anywhere; color: #bac9d7; font-size: .83rem; }
+    /* Light console theme */
+    :root { color-scheme: light; background: #f7f8fa; color: #18212f; }
+    body { background: #f7f8fa; }
+    .auth-page { background: radial-gradient(800px 520px at 18% 0%, #e6f2ff 0%, transparent 68%), radial-gradient(700px 500px at 100% 100%, #eef4ff 0%, transparent 70%), #f7f8fa; }
+    .auth-card { border-color: #e3e7ed; background: #fff; box-shadow: 0 24px 70px #1d35501a; }
+    .brand { color: #172033; }
+    .brand-mark { color: #fff; background: linear-gradient(135deg, #3988f7, #6366f1); box-shadow: 0 0 22px #4389ed3d; }
+    .eyebrow { color: #397bd6; }
+    h1, h2 { color: #18212f; }
+    .muted { color: #687588; }
+    label { color: #526072; }
+    input, select { color: #1e293b; border-color: #dce2e9; background: #fff; }
+    input::placeholder { color: #97a3b3; }
+    .button { color: #fff; background: #397bed; }
+    .button:hover { background: #256de0; }
+    .button.secondary { color: #455468; border-color: #d8e0e9; background: #fff; }
+    .button.secondary:hover { color: #1e293b; background: #f3f6fa; }
+    .button.ghost { color: #637185; }
+    .button.ghost:hover { color: #1d2938; background: #edf2f7; }
+    .status { color: #6d7c90; border-color: #e0e6ed; background: #f8fafc; }
+    .status.warning { border-color: #ecd5a0; color: #9a6b17; }
+    .status.ok { border-color: #b8dfd0; color: #26795d; }
+    .app { background: #f7f8fa; }
+    .sidebar { border-color: #e4e8ee; background: #fff; }
+    .nav-label { color: #9aa5b4; }
+    .nav-item { color: #66758a; }
+    .nav-item:hover { color: #253247; background: #f2f6fb; }
+    .nav-item.active { color: #286dcc; background: #edf5ff; box-shadow: inset 2px 0 #3982ed; }
+    .nav-icon { color: #4f8fe6; }
+    .nav-badge { border-color: #dce4ed; color: #7d8999; }
+    .sidebar-foot { border-color: #edf0f3; }
+    .sidebar-foot small { color: #94a0ae; }
+    .topbar { border-color: #e4e8ee; background: #fffffff2; }
+    .crumb { color: #8895a6; }
+    .crumb strong { color: #263346; }
+    .system-state { color: #328466; }
+    .dot { background: #38b587; box-shadow: 0 0 0 4px #38b5871c; }
+    .account-chip { color: #546275; border-color: #dde4ec; background: #fff; }
+    .avatar { color: #fff; background: #4c8eeb; }
+    .sync-note { color: #3976c7; border-color: #cfe1f9; background: #f1f7ff; }
+    .stat { border-color: #e2e7ed; background: #fff; box-shadow: 0 1px 2px #20374d08; }
+    .stat-label { color: #778599; }
+    .stat-value { color: #1b2839; }
+    .stat-detail { color: #8493a6; }
+    .table-card { border-color: #e1e6ec; background: #fff; box-shadow: 0 1px 2px #20374d08; }
+    .table-toolbar { border-color: #e8ecf0; }
+    .toolbar-title span { color: #8491a1; }
+    th { color: #7d8b9d; border-color: #e8ecf0; background: #fafbfc; }
+    td { color: #617084; border-color: #edf0f3; }
+    tbody tr:hover { background: #f7faff; }
+    .thread-title { color: #253247; }
+    .thread-id { color: #8291a4; }
+    .tag { color: #3976bf; border-color: #d3e4f5; background: #f2f8ff; }
+    .tag.archived { color: #a97619; border-color: #ecd9ac; background: #fff9ea; }
+    .tag.local::before { background: #4d93ec; }
+    .row-action { color: #3976c7; border-color: #d1e1f3; background: #fff; }
+    .row-action:hover { color: #fff; border-color: #397bed; background: #397bed; }
+    .empty { color: #8694a5; }
+    .setup-card { border-color: #e1e6ec; background: #fff; box-shadow: 0 1px 2px #20374d08; }
+    .setup-card p { color: #69788b; }
+    .path-box { border-color: #e0e6ed; background: #f8fafc; }
+    .path-box code { color: #3976c7; }
+    .setup-item { color: #657487; }
+    .step { color: #397bed; border-color: #bbd7f7; background: #eff6ff; }
+    .feature { color: #728195; background: #f7f9fc; }
+    .feature strong { color: #445367; }
+    .toast { color: #315f94; border-color: #cde0f5; background: #f3f8ff; box-shadow: 0 16px 45px #1e395017; }
+    .detail { border-color: #e0e6ed; background: #fff; box-shadow: -16px 0 50px #1e395017; }
+    .detail-title { color: #1f2c3e; }
+    .detail-grid div { border-color: #edf0f3; }
+    .detail-grid small { color: #8795a6; }
+    .detail-grid span { color: #4e5e72; }
+    @media (max-width: 920px) { .app { grid-template-columns: 68px minmax(0, 1fr); } .sidebar { padding: 20px 8px; } .sidebar .brand span, .nav-label, .nav-item .nav-text, .nav-badge, .sidebar-foot { display: none; } .sidebar .brand { justify-content: center; padding: 0 0 28px; } .nav-item { justify-content: center; padding: 11px; } .topbar, .content { padding-left: 24px; padding-right: 24px; } .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .setup-panel { grid-template-columns: 1fr; } }
+    @media (max-width: 620px) { .topbar { min-height: 58px; padding: 0 14px; } .crumb { display: none; } .content { padding: 24px 14px; } .page-heading { align-items: flex-start; flex-direction: column; margin-bottom: 20px; } .stats { grid-template-columns: 1fr 1fr; gap: 9px; } .stat { min-height: 96px; padding: 13px; } .stat-value { margin-top: 10px; font-size: 1.35rem; } .table-toolbar { align-items: stretch; flex-direction: column; } .filters, .search { width: 100%; } .filters { display: grid; grid-template-columns: 1fr 1fr; } .search { grid-column: 1 / -1; } .account-chip { display: none; } }
+  </style>
+</head>
+<body>
+  <section id="login-view" class="auth-page">
+    <div class="auth-card">
+      <div class="brand"><span class="brand-mark">↗</span><span>codex-sync</span></div>
+      <div class="eyebrow">Private sync console</div>
+      <h1>登录同步控制台</h1>
+      <p class="muted">使用已开通账户访问你的私有对话仓库。本服务不提供注册入口。</p>
+      <form id="login-form">
+        <label>账户名 <input id="username" name="username" value="jasper" autocomplete="username" required></label>
+        <label>密码 <input id="password" name="password" type="password" autocomplete="current-password" required></label>
+        <button class="button wide" type="submit">登录控制台 <span>→</span></button>
+      </form>
+      <div id="login-status" class="status">等待账户认证。</div>
+    </div>
+  </section>
+
+  <section id="grant-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">↗</span><span>codex-sync</span></div>
+      <div class="nav-label">工作区</div>
+      <nav class="nav"><button class="nav-item active" type="button"><span class="nav-icon">⌂</span><span class="nav-text">连接本机</span></button></nav>
+      <div class="nav-label" style="margin-top:24px">仓库</div>
+      <nav class="nav"><button class="nav-item" type="button" disabled><span class="nav-icon">☁</span><span class="nav-text">云端对话</span><span class="nav-badge">待连接</span></button></nav>
+      <div class="sidebar-foot"><small>私人同步仓库</small><small>v0.1 · 本地索引</small></div>
+    </aside>
+    <section class="workspace">
+      <header class="topbar"><div class="crumb">工作区 / <strong>连接本机</strong></div><div class="top-actions"><span class="system-state"><i class="dot"></i>服务正常</span><span id="grant-account" class="account-chip"><i class="avatar">J</i>jasper</span></div></header>
+      <main class="content">
+        <div class="page-heading"><div><div class="eyebrow" style="margin-top:0">本地数据源</div><h1>连接 Codex 本机目录</h1><p class="muted">选择文件夹后，控制台将在浏览器中读取线程标题索引。</p></div><div class="sync-note">● 未连接本机目录</div></div>
+        <section class="setup-panel">
+          <div class="setup-card"><h2>授权本机 <code>.codex</code> 文件夹</h2><p>你需要在系统文件选择器中明确选择目录。此步骤只读取 <code>state_5.sqlite</code> 以建立本地对话列表，不上传聊天内容。</p><div class="setup-list"><div class="setup-item"><span class="step">1</span><span>在系统选择器中打开你的 Codex 配置目录。</span></div><div class="setup-item"><span class="step">2</span><span>确认授权后读取本地线程标题与会话数量。</span></div><div class="setup-item"><span class="step">3</span><span>进入控制台，筛选和查看本地对话。</span></div></div><button id="grant" class="button" type="button">选择 .codex 文件夹 <span>→</span></button><input id="fallback" type="file" webkitdirectory multiple hidden><div id="grant-status" class="status">尚未授权本地文件夹。</div></div>
+          <aside class="setup-card"><h2>查找目录</h2><p>macOS / Linux 通常使用以下默认位置。设置过 <code>CODEX_HOME</code> 时请以其为准。</p><div class="path-box"><code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code><button id="copy-command" class="button secondary" type="button">复制</button></div><div class="feature-list"><div class="feature"><strong>macOS 快捷方式</strong>文件选择器按 <code>⌘⇧G</code>，可直接前往目录。</div><div class="feature"><strong>隐藏文件</strong>若未显示 <code>.codex</code>，按 <code>⌘⇧.</code>。</div></div></aside>
+        </section>
+      </main>
+    </section>
+  </section>
+
+  <section id="dashboard-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark">↗</span><span>codex-sync</span></div>
+      <div class="nav-label">工作区</div>
+      <nav class="nav"><button id="local-nav" class="nav-item active" type="button"><span class="nav-icon">▦</span><span class="nav-text">本地对话</span><span id="nav-count" class="nav-badge">0</span></button><button id="cloud-nav" class="nav-item" type="button"><span class="nav-icon">☁</span><span class="nav-text">云端对话</span><span id="cloud-nav-count" class="nav-badge">0</span></button></nav>
+      <div class="nav-label" style="margin-top:24px">管理</div>
+      <nav class="nav"><button id="reconnect" class="nav-item" type="button"><span class="nav-icon">⌁</span><span class="nav-text">重新连接目录</span></button></nav>
+      <div class="sidebar-foot"><small>私人同步仓库</small><small>v0.1 · 本地索引</small></div>
+    </aside>
+    <section class="workspace">
+      <header class="topbar"><div class="crumb">工作区 / <strong>本地对话</strong></div><div class="top-actions"><span class="system-state"><i class="dot"></i>服务正常</span><span id="account" class="account-chip"><i class="avatar">J</i>jasper</span><button id="logout" class="button ghost" type="button">退出</button></div></header>
+      <main id="local-view" class="content">
+        <div class="page-heading"><div><div class="eyebrow" style="margin-top:0">Local index</div><h1>本地对话</h1><p id="summary" class="muted">正在读取本地索引…</p></div><div class="sync-note"><i class="dot"></i> 本地索引已连接</div></div>
+        <section class="stats"><article class="stat"><div class="stat-label">线程记录</div><div id="stat-threads" class="stat-value">0</div><div class="stat-detail">来自 state_5.sqlite</div></article><article class="stat"><div class="stat-label">会话档案</div><div id="stat-sessions" class="stat-value">0</div><div class="stat-detail">sessions/ 中的 JSONL</div></article><article class="stat"><div class="stat-label">活跃对话</div><div id="stat-active" class="stat-value">0</div><div class="stat-detail">未归档线程</div></article><article class="stat"><div class="stat-label">云端包</div><div id="stat-cloud" class="stat-value">0</div><div class="stat-detail">当前账户的已上传包</div></article></section>
+        <section class="table-card"><div class="table-toolbar"><div class="toolbar-title"><h2>所有本地对话</h2><span id="thread-count">0 条记录</span></div><div class="filters"><input id="tag-field" class="tag-field" value="browser" aria-label="上传标签" title="上传标签"><input id="thread-search" class="search" type="search" placeholder="搜索标题或线程 ID"><select id="thread-filter" aria-label="筛选对话"><option value="all">全部状态</option><option value="active">仅活跃</option><option value="archived">仅归档</option></select></div></div><div class="table-wrap"><table><thead><tr><th>对话</th><th>更新时间</th><th>来源</th><th>状态</th><th></th></tr></thead><tbody id="threads"></tbody></table><div id="empty" class="empty" hidden>没有符合条件的本地对话。</div></div></section>
+      </main>
+      <section id="cloud-view" class="content" hidden>
+        <div class="page-heading"><div><div class="eyebrow" style="margin-top:0">Cloud repository</div><h1>云端对话仓库</h1><p id="cloud-summary" class="muted">正在读取已上传的对话包…</p></div><button id="cloud-refresh" class="button secondary" type="button">刷新列表</button></div>
+        <section class="stats"><article class="stat"><div class="stat-label">云端包</div><div id="cloud-stat-packages" class="stat-value">0</div><div class="stat-detail">当前账户的不可变包</div></article><article class="stat"><div class="stat-label">标签</div><div id="cloud-stat-tags" class="stat-value">0</div><div class="stat-detail">用于设备或分组</div></article><article class="stat"><div class="stat-label">已验证包</div><div id="cloud-stat-valid" class="stat-value">0</div><div class="stat-detail">包含 codex-sync 清单</div></article><article class="stat"><div class="stat-label">下载方式</div><div class="stat-value" style="font-size:1.1rem;margin-top:19px">原始包</div><div class="stat-detail">用 CLI pull 恢复至 Codex</div></article></section>
+        <section class="table-card"><div class="table-toolbar"><div class="toolbar-title"><h2>已上传对话</h2><span id="cloud-count">0 条记录</span></div><div class="filters"><select id="cloud-tag-filter" aria-label="筛选云端标签"><option value="all">全部标签</option></select></div></div><div class="table-wrap"><table><thead><tr><th>对话</th><th>标签</th><th>上传时间</th><th>包大小</th><th></th></tr></thead><tbody id="cloud-threads"></tbody></table><div id="cloud-empty" class="empty" hidden>云端仓库尚无符合条件的对话包。</div></div></section>
+      </section>
+    </section>
+  </section>
+
+  <aside id="detail" class="detail" hidden><div class="detail-header"><h2>线程详情</h2><button id="close-detail" class="button ghost" type="button">关闭</button></div><div id="detail-title" class="detail-title"></div><div class="detail-grid"><div><small>线程 ID</small><span id="detail-id"></span></div><div><small>更新时间</small><span id="detail-time"></span></div><div><small>来源</small><span>本机 Codex 索引</span></div><div><small>状态</small><span id="detail-status"></span></div></div><p class="muted" style="margin-top:26px;font-size:.82rem">此视图不读取聊天内容。上传、下载与云端版本将在远端列表完成后提供。</p></aside>
+  <aside id="restore-command" class="detail" hidden><div class="detail-header"><h2>生成恢复命令</h2><button id="close-restore-command" class="button ghost" type="button">关闭</button></div><p class="muted" style="margin-top:20px;font-size:.84rem">网页不会写入本机 Codex。填写目标目录后，将命令复制到本机终端执行。</p><label style="margin-top:22px">目标 Codex 目录 <input id="restore-codex-home" value="~/.codex" spellcheck="false"></label><div class="path-box" style="align-items:flex-start;margin-top:18px"><code id="restore-command-text" style="white-space:pre-wrap;word-break:break-all"></code></div><button id="copy-restore-command" class="button wide" style="margin-top:14px" type="button">复制恢复命令</button><p class="muted" style="margin-top:18px;font-size:.78rem">请在包含 <code>codex_sync.py</code> 的项目目录中执行；当前验证服务器使用自签名证书，因此命令包含 <code>--insecure</code>。</p></aside>
+  <div id="toast" class="toast" hidden></div>
+
+  <script>
+    const loginView = document.querySelector('#login-view');
+    const grantView = document.querySelector('#grant-view');
+    const dashboardView = document.querySelector('#dashboard-view');
+    const loginStatus = document.querySelector('#login-status');
+    const grantStatus = document.querySelector('#grant-status');
+    const fallback = document.querySelector('#fallback');
+    const threadsContainer = document.querySelector('#threads');
+    const threadSearch = document.querySelector('#thread-search');
+    const threadFilter = document.querySelector('#thread-filter');
+    const localView = document.querySelector('#local-view');
+    const cloudView = document.querySelector('#cloud-view');
+    const cloudThreads = document.querySelector('#cloud-threads');
+    const sqlReady = initSqlJs({ locateFile: file => `/static/${file}` });
+    let allThreads = [];
+    let cloudPackages = [];
+    let currentAccount = '';
+    let sessionFiles = new Map();
+    let restorePackage;
+    let toastTimer;
+
+    const say = (element, message, kind = '') => { element.textContent = message; element.className = `status ${kind}`; };
+    const show = view => { for (const element of [loginView, grantView, dashboardView]) element.hidden = element !== view; };
+    const showToast = message => { const toast = document.querySelector('#toast'); toast.textContent = message; toast.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toast.hidden = true; }, 2800); };
+    const requestJson = async (path, options = {}) => { const response = await fetch(path, { credentials: 'same-origin', ...options }); const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || `请求失败（HTTP ${response.status}）`); return body; };
+    const formatTime = value => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(Number(value) * 1000)) : '未知时间';
+    const initials = account => account.slice(0, 1).toUpperCase();
+    const formatBytes = value => value < 1024 * 1024 ? `${Math.max(1, Math.round(value / 1024))} KB` : `${(value / 1024 / 1024).toFixed(1)} MB`;
+    const sha256 = async bytes => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))).map(byte => byte.toString(16).padStart(2, '0')).join('');
+
+    function switchWorkspace(name) {
+      const cloud = name === 'cloud';
+      localView.hidden = cloud;
+      cloudView.hidden = !cloud;
+      document.querySelector('#local-nav').classList.toggle('active', !cloud);
+      document.querySelector('#cloud-nav').classList.toggle('active', cloud);
+      document.querySelector('.crumb strong').textContent = cloud ? '云端对话' : '本地对话';
+      if (cloud) refreshCloud();
+    }
+
+    function openDetail(thread) {
+      document.querySelector('#detail-title').textContent = thread.title || thread.firstUserMessage || '未命名对话';
+      document.querySelector('#detail-id').textContent = thread.id;
+      document.querySelector('#detail-time').textContent = formatTime(thread.updatedAt);
+      document.querySelector('#detail-status').textContent = thread.archived ? '已归档' : '活跃';
+      document.querySelector('#detail').hidden = false;
+    }
+
+    function renderThreads() {
+      const query = threadSearch.value.trim().toLowerCase();
+      const state = threadFilter.value;
+      const visible = allThreads.filter(thread => {
+        const title = (thread.title || thread.firstUserMessage || '').toLowerCase();
+        const matchesQuery = !query || title.includes(query) || thread.id.toLowerCase().includes(query);
+        const matchesState = state === 'all' || (state === 'archived' ? thread.archived : !thread.archived);
+        return matchesQuery && matchesState;
+      });
+      threadsContainer.replaceChildren();
+      for (const thread of visible) {
+        const row = document.createElement('tr');
+        const titleCell = document.createElement('td');
+        const title = document.createElement('div');
+        title.className = 'thread-title';
+        title.textContent = thread.title || thread.firstUserMessage || '未命名对话';
+        const id = document.createElement('div');
+        id.className = 'thread-id';
+        id.textContent = thread.id;
+        titleCell.append(title, id);
+        const timeCell = document.createElement('td'); timeCell.textContent = formatTime(thread.updatedAt);
+        const originCell = document.createElement('td'); originCell.innerHTML = '<span class="tag local">本机</span>';
+        const stateCell = document.createElement('td'); stateCell.innerHTML = thread.archived ? '<span class="tag archived">已归档</span>' : '<span class="tag">已索引</span>';
+        const actionCell = document.createElement('td'); const actions = document.createElement('div'); actions.className = 'action-group';
+        const upload = document.createElement('button'); upload.className = 'row-action'; upload.type = 'button'; upload.textContent = '上传'; upload.addEventListener('click', () => uploadThread(thread));
+        const action = document.createElement('button'); action.className = 'row-action'; action.type = 'button'; action.textContent = '详情'; action.addEventListener('click', () => openDetail(thread)); actions.append(upload, action); actionCell.append(actions);
+        row.append(titleCell, timeCell, originCell, stateCell, actionCell);
+        threadsContainer.append(row);
+      }
+      document.querySelector('#thread-count').textContent = `${visible.length} / ${allThreads.length} 条记录`;
+      document.querySelector('#empty').hidden = visible.length !== 0;
+    }
+
+    function showDashboard(account, threads, sessions) {
+      allThreads = threads;
+      const active = threads.filter(thread => !thread.archived).length;
+      document.querySelector('#account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
+      document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(account)}</i>${account}`;
+      document.querySelector('#summary').textContent = `已连接本机 Codex 索引，共发现 ${threads.length} 条线程记录。`;
+      document.querySelector('#stat-threads').textContent = threads.length;
+      document.querySelector('#stat-sessions').textContent = sessions;
+      document.querySelector('#stat-active').textContent = active;
+      document.querySelector('#nav-count').textContent = threads.length;
+      currentAccount = account;
+      renderThreads();
+      refreshCloud();
+      show(dashboardView);
+    }
+
+    async function readIndex(databaseFile) {
+      const SQL = await sqlReady;
+      const database = new SQL.Database(new Uint8Array(await databaseFile.arrayBuffer()));
+      try {
+        const result = database.exec('SELECT * FROM threads ORDER BY recency_at DESC, updated_at DESC');
+        if (!result.length) return [];
+        const columns = result[0].columns;
+        return result[0].values.map(values => {
+          const record = Object.fromEntries(columns.map((column, index) => [column, values[index]]));
+          return { id: record.id, title: record.title, firstUserMessage: record.first_user_message, updatedAt: record.updated_at, archived: Boolean(record.archived), record };
+        });
+      } finally { database.close(); }
+    }
+
+    async function inspectDirectory(directory) {
+      let sessions = 0; let databaseFile; sessionFiles = new Map();
+      async function walk(handle, relative = '', inSessions = false) {
+        for await (const [name, child] of handle.entries()) {
+          const path = relative ? `${relative}/${name}` : name;
+          if (child.kind === 'file') {
+            if (name === 'state_5.sqlite') databaseFile = await child.getFile();
+            if (inSessions && name.endsWith('.jsonl')) { sessions++; const match = name.match(/([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\.jsonl$/); if (match) sessionFiles.set(match[1], { handle: child, path }); }
+          } else if (child.kind === 'directory') await walk(child, path, inSessions || name === 'sessions');
+        }
+      }
+      await walk(directory); return { databaseFile, sessions };
+    }
+
+    async function loadAndDisplay(databaseFile, sessions) {
+      if (!databaseFile) throw new Error('未找到 state_5.sqlite；请选择 .codex 文件夹。');
+      say(grantStatus, '正在读取本机线程标题索引…');
+      const account = await requestJson('/v1/auth/me');
+      const threads = await readIndex(databaseFile);
+      showDashboard(account.account, threads, sessions);
+    }
+
+    function tarHeader(name, size) {
+      const header = new Uint8Array(512); const encoder = new TextEncoder();
+      const write = (offset, length, value) => header.set(encoder.encode(value).slice(0, length), offset);
+      const octal = (offset, length, value) => write(offset, length, `${value.toString(8).padStart(length - 1, '0')}\0`);
+      write(0, 100, name); octal(100, 8, 0o644); octal(108, 8, 0); octal(116, 8, 0); octal(124, 12, size); octal(136, 12, Math.floor(Date.now() / 1000));
+      header.fill(32, 148, 156); header[156] = 48; write(257, 6, 'ustar\0'); write(263, 2, '00');
+      const sum = header.reduce((total, byte) => total + byte, 0); write(148, 8, `${sum.toString(8).padStart(6, '0')}\0 `);
+      return header;
+    }
+
+    function createTar(entries) {
+      const blocks = [];
+      for (const entry of entries) {
+        blocks.push(tarHeader(entry.name, entry.data.length), entry.data);
+        const padding = (512 - entry.data.length % 512) % 512; if (padding) blocks.push(new Uint8Array(padding));
+      }
+      blocks.push(new Uint8Array(1024)); const length = blocks.reduce((total, block) => total + block.length, 0); const result = new Uint8Array(length); let offset = 0;
+      for (const block of blocks) { result.set(block, offset); offset += block.length; } return result;
+    }
+
+    async function gzip(bytes) {
+      if (!('CompressionStream' in window)) throw new Error('此浏览器不支持 gzip 打包；请使用最新版 Chrome 或 Edge。');
+      const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    }
+
+    async function uploadThread(thread) {
+      const session = sessionFiles.get(thread.id); const tag = document.querySelector('#tag-field').value.trim();
+      if (!session) { showToast('本地会话文件未找到，无法上传此线程。'); return; }
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(tag)) { showToast('标签仅可使用字母、数字、点、下划线和连字符。'); return; }
+      try {
+        showToast('正在打包并上传对话…'); const sessionFile = session.handle ? await session.handle.getFile() : session.file; const sessionBytes = new Uint8Array(await sessionFile.arrayBuffer()); const sessionHash = await sha256(sessionBytes);
+        const manifest = { format: 1, entries: [{ path: session.path, sha256: sessionHash, size: sessionBytes.length }], thread_registration: { table: 'threads', record: thread.record } };
+        const manifestBytes = new TextEncoder().encode(JSON.stringify(manifest)); const packageBytes = await gzip(createTar([{ name: '.codex-sync/manifest.json', data: manifestBytes }, { name: session.path, data: sessionBytes }])); const packageHash = await sha256(packageBytes);
+        const packageId = `${thread.id}-${packageHash.slice(0, 16)}`; const response = await fetch(`/v1/accounts/${encodeURIComponent(currentAccount)}/tags/${encodeURIComponent(tag)}/packages/${packageId}`, { method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/gzip', 'X-Content-SHA256': packageHash }, body: packageBytes });
+        const body = await response.json().catch(() => ({})); if (!response.ok) throw new Error(body.error || `上传失败（HTTP ${response.status}）`);
+        showToast(body.status === 'already-present' ? '云端已存在相同包。' : '上传完成，已写入云端仓库。'); await refreshCloud();
+      } catch (error) { showToast(`上传失败：${error.message}`); }
+    }
+
+    function renderCloud() {
+      const selected = document.querySelector('#cloud-tag-filter').value; const visible = cloudPackages.filter(item => selected === 'all' || item.tag === selected); cloudThreads.replaceChildren();
+      for (const item of visible) {
+        const row = document.createElement('tr'); const title = document.createElement('td'); const heading = document.createElement('div'); heading.className = 'thread-title'; heading.textContent = item.title || item.package_id; const id = document.createElement('div'); id.className = 'thread-id'; id.textContent = `包 ${item.package_id}`; title.append(heading, id);
+        const tag = document.createElement('td'); tag.innerHTML = `<span class="tag">${item.tag}</span>`; const time = document.createElement('td'); time.textContent = formatTime(item.modified_at); const bytes = document.createElement('td'); bytes.textContent = formatBytes(item.bytes);
+        const actions = document.createElement('td'); const group = document.createElement('div'); group.className = 'action-group'; const download = document.createElement('button'); download.className = 'row-action'; download.type = 'button'; download.textContent = '下载包'; download.addEventListener('click', () => downloadPackage(item)); const load = document.createElement('button'); load.className = 'row-action'; load.type = 'button'; load.textContent = '恢复命令'; load.addEventListener('click', () => openRestoreCommand(item)); group.append(download, load); actions.append(group); row.append(title, tag, time, bytes, actions); cloudThreads.append(row);
+      }
+      document.querySelector('#cloud-count').textContent = `${visible.length} / ${cloudPackages.length} 条记录`; document.querySelector('#cloud-empty').hidden = visible.length !== 0;
+    }
+
+    async function refreshCloud() {
+      if (!currentAccount) return;
+      try {
+        const inventory = await requestJson(`/v1/accounts/${encodeURIComponent(currentAccount)}/packages`); cloudPackages = inventory.packages; const tags = [...new Set(cloudPackages.map(item => item.tag))].sort(); const selector = document.querySelector('#cloud-tag-filter'); const previous = selector.value; selector.replaceChildren(new Option('全部标签', 'all'), ...tags.map(tag => new Option(tag, tag))); selector.value = tags.includes(previous) ? previous : 'all';
+        document.querySelector('#stat-cloud').textContent = cloudPackages.length; document.querySelector('#cloud-nav-count').textContent = cloudPackages.length; document.querySelector('#cloud-stat-packages').textContent = cloudPackages.length; document.querySelector('#cloud-stat-tags').textContent = tags.length; document.querySelector('#cloud-stat-valid').textContent = cloudPackages.filter(item => item.valid).length; document.querySelector('#cloud-summary').textContent = `已读取 ${cloudPackages.length} 个不可变对话包。`; renderCloud();
+      } catch (error) { document.querySelector('#cloud-summary').textContent = `无法读取云端仓库：${error.message}`; }
+    }
+
+    async function downloadPackage(item) {
+      try {
+        const response = await fetch(`/v1/accounts/${encodeURIComponent(currentAccount)}/tags/${encodeURIComponent(item.tag)}/packages/${encodeURIComponent(item.package_id)}`, { credentials: 'same-origin' }); if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob(); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `${item.package_id}.tar.gz`; link.click(); setTimeout(() => URL.revokeObjectURL(link.href), 1000); showToast('已下载原始对话包；使用 CLI pull 可恢复到本机 Codex。');
+      } catch (error) { showToast(`下载失败：${error.message}`); }
+    }
+
+    const shellQuote = value => `'${String(value).replaceAll("'", "'\\\"'\\\"'")}'`;
+    function updateRestoreCommand() {
+      if (!restorePackage) return;
+      const target = document.querySelector('#restore-codex-home').value.trim() || '~/.codex';
+      const command = [`python3 codex_sync.py pull`, `--insecure`, `--url ${shellQuote(window.location.origin)}`, `--account ${shellQuote(currentAccount)}`, `--tag ${shellQuote(restorePackage.tag)}`, `--package-id ${shellQuote(restorePackage.package_id)}`, `--codex-home ${shellQuote(target)}`].join(' ');
+      document.querySelector('#restore-command-text').textContent = command;
+    }
+
+    function openRestoreCommand(item) {
+      restorePackage = item; updateRestoreCommand(); document.querySelector('#restore-command').hidden = false;
+    }
+
+    document.querySelector('#login-form').addEventListener('submit', async event => {
+      event.preventDefault(); const username = document.querySelector('#username').value; const password = document.querySelector('#password').value; say(loginStatus, '正在验证账户…');
+      try { await requestJson('/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) }); document.querySelector('#password').value = ''; document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(username)}</i>${username}`; show(grantView); }
+      catch (error) { say(loginStatus, `登录失败：${error.message}`, 'warning'); }
+    });
+    document.querySelector('#grant').addEventListener('click', async () => {
+      try { if ('showDirectoryPicker' in window) { const selection = await window.showDirectoryPicker({ mode: 'read' }); const { databaseFile, sessions } = await inspectDirectory(selection); await loadAndDisplay(databaseFile, sessions); } else fallback.click(); }
+      catch (error) { say(grantStatus, `无法读取目录：${error.message}`, 'warning'); }
+    });
+    fallback.addEventListener('change', async () => {
+      try { const files = [...fallback.files]; const databaseFile = files.find(file => file.name === 'state_5.sqlite'); const sessionList = files.filter(file => file.webkitRelativePath.includes('/sessions/') && file.name.endsWith('.jsonl')); sessionFiles = new Map(sessionList.map(file => { const match = file.name.match(/([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\.jsonl$/); return match ? [match[1], { file, path: file.webkitRelativePath.replace(/^[^/]+\//, '') }] : null; }).filter(Boolean)); await loadAndDisplay(databaseFile, sessionList.length); }
+      catch (error) { say(grantStatus, `无法读取目录：${error.message}`, 'warning'); }
+    });
+    document.querySelector('#copy-command').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(document.querySelector('#path-command').textContent); showToast('定位命令已复制到剪贴板。'); }
+      catch { say(grantStatus, '无法自动复制，请手动复制上方命令。', 'warning'); }
+    });
+    document.querySelector('#reconnect').addEventListener('click', () => { show(grantView); });
+    document.querySelector('#close-detail').addEventListener('click', () => { document.querySelector('#detail').hidden = true; });
+    document.querySelector('#close-restore-command').addEventListener('click', () => { document.querySelector('#restore-command').hidden = true; });
+    document.querySelector('#restore-codex-home').addEventListener('input', updateRestoreCommand);
+    document.querySelector('#copy-restore-command').addEventListener('click', async () => { try { await navigator.clipboard.writeText(document.querySelector('#restore-command-text').textContent); showToast('恢复命令已复制。'); } catch { showToast('无法自动复制，请手动复制命令。'); } });
+    document.querySelector('#logout').addEventListener('click', async () => { await requestJson('/v1/auth/logout', { method: 'POST' }); document.querySelector('#detail').hidden = true; show(loginView); say(loginStatus, '已退出登录。'); });
+    threadSearch.addEventListener('input', renderThreads); threadFilter.addEventListener('change', renderThreads);
+    document.querySelector('#local-nav').addEventListener('click', () => switchWorkspace('local'));
+    document.querySelector('#cloud-nav').addEventListener('click', () => switchWorkspace('cloud'));
+    document.querySelector('#cloud-refresh').addEventListener('click', refreshCloud);
+    document.querySelector('#cloud-tag-filter').addEventListener('change', renderCloud);
+    (async () => { try { const account = await requestJson('/v1/auth/me'); document.querySelector('#grant-account').innerHTML = `<i class="avatar">${initials(account.account)}</i>${account.account}`; show(grantView); } catch { show(loginView); } })();
+  </script>
+</body>
+</html>
