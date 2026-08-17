@@ -11,31 +11,51 @@ target machine. It creates a SQLite backup before any registration write.
 
 ## Commands
 
+The CLI stores only a server session token in `~/.codex-sync/sessions.json`
+with mode `0600`; it never saves the password.
+
 ```sh
-export CODEX_SYNC_PASSWORD='your-password'
+# The current proof server uses a self-signed HTTPS certificate.
+python3 codex_sync.py login --insecure --url https://sync.example.com --account demo
+
+python3 codex_sync.py list --url https://sync.example.com --account demo --tag mac
 
 python3 codex_sync.py push --url https://sync.example.com --account demo --tag mac \
   --session ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl
+
+# Download only: this does not touch local Codex state.
+python3 codex_sync.py download --url https://sync.example.com --account demo --tag mac \
+  --package-id <package-id> --output ~/Downloads/thread.tar.gz
+
+# Load an existing local package into Codex.
+python3 codex_sync.py load --package ~/Downloads/thread.tar.gz --codex-home ~/.codex
+
+# Download and load in one command.
 python3 codex_sync.py pull --url https://sync.example.com --account demo --tag mac \
-  --package-id <printed-package-id> --codex-home /tmp/restore-home
+  --package-id <package-id> --codex-home ~/.codex
+
+python3 codex_sync.py logout --url https://sync.example.com --account demo
 ```
 
-`push` creates no permanent local package. `pull` downloads, restores, and
-registers the thread in one command. The low-level `pack`, `upload`,
-`download`, and `restore` commands remain available for diagnostics.
+`push` creates no permanent local package. `download` only writes the requested
+package file. `load` restores an existing local package and registers its
+thread. `pull` is the one-step download-and-load operation. The low-level
+`pack`, `upload`, and `restore` aliases remain available for diagnostics.
 
-The client reads the password from `CODEX_SYNC_PASSWORD`, so the password does
-not appear in a command argument. `--username` defaults to `--account`.
-For a temporary self-signed HTTPS certificate, add `--insecure`; do not use it
-once the service has a trusted certificate.
+For a temporary self-signed HTTPS certificate, add `--insecure` to `login`.
+The choice is saved with that local session profile. `CODEX_SYNC_PASSWORD`
+remains available as a non-persistent fallback for automation.
 
 ## Browser page
 
 The service also serves a browser page at `/`. It has no registration flow:
 the operator creates accounts in the server-only account file. After logging
 in, the user explicitly selects their local `.codex` directory. The page reads
-only `state_5.sqlite` in the browser to show thread titles and timestamps; it
-does not read or upload conversation JSONL at that point.
+`state_5.sqlite` in the browser to show thread titles and timestamps, and can
+package/upload a selected JSONL without parsing its conversation content. The
+cloud repository lists packages by tag and downloads raw packages. It does not
+load packages into `.codex`; instead it generates a copyable `pull` command
+after the user enters a target directory.
 
 `sql.js` is vendored under `web/vendor/` so title listing does not depend on a
 third-party CDN at runtime.

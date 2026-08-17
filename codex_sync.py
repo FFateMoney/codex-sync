@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+from http.cookies import SimpleCookie
+import getpass
 import hashlib
 import io
 import json
@@ -28,6 +30,7 @@ FORMAT_VERSION = 1
 CHUNK_SIZE = 1024 * 1024
 IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 SESSION_ID = re.compile(r"([0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})\.jsonl\Z")
+AUTH_FILE = Path.home() / ".codex-sync" / "sessions.json"
 
 
 class SyncError(Exception):
@@ -153,17 +156,45 @@ def url_for(args: argparse.Namespace) -> str:
     return f"{args.url.rstrip('/')}/v1/accounts/{args.account}/tags/{args.tag}/packages/{args.package_id}"
 
 
+def auth_key(url: str, account: str) -> str:
+    return f"{url.rstrip('/')}\n{account}"
+
+
+def read_auth_records() -> dict:
+    try:
+        data = json.loads(AUTH_FILE.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        return {}
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SyncError(f"could not read local login state: {exc}") from exc
+
+
+def write_auth_records(records: dict) -> None:
+    AUTH_FILE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=AUTH_FILE.parent, mode="w", encoding="utf-8", delete=False) as temporary:
+        temporary.write(json.dumps(records, sort_keys=True))
+        temporary_path = Path(temporary.name)
+    temporary_path.chmod(0o600)
+    os.replace(temporary_path, AUTH_FILE)
+
+
 def authorization_header(args: argparse.Namespace) -> dict[str, str]:
+    record = read_auth_records().get(auth_key(args.url, args.account))
+    if isinstance(record, dict) and isinstance(record.get("session_token"), str):
+        return {"Cookie": f"codex_sync_session={record['session_token']}"}
     password = os.environ.get(args.password_env)
     if password is None:
-        raise SyncError(f"set {args.password_env} before connecting to the authenticated service")
+        raise SyncError(f"run 'codex-sync login --url {args.url} --account {args.account}' first")
     username = args.username or args.account
     credential = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
     return {"Authorization": f"Basic {credential}"}
 
 
 def open_request(req: request.Request, args: argparse.Namespace):
-    context = ssl._create_unverified_context() if args.insecure else None
+    record = read_auth_records().get(auth_key(args.url, args.account))
+    allow_self_signed = args.insecure or (isinstance(record, dict) and record.get("insecure") is True)
+    context = ssl._create_unverified_context() if allow_self_signed else None
     return request.urlopen(req, timeout=args.timeout, context=context)
 
 
@@ -214,6 +245,69 @@ def download(args: argparse.Namespace) -> None:
         raise SyncError(f"download failed: HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')}") from exc
     except error.URLError as exc:
         raise SyncError(f"download failed: {exc.reason}") from exc
+
+
+def login(args: argparse.Namespace) -> None:
+    password = getpass.getpass(f"Password for {args.account}: ")
+    payload = json.dumps({"username": args.account, "password": password}).encode("utf-8")
+    req = request.Request(
+        f"{args.url.rstrip('/')}/v1/auth/login",
+        data=payload,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    context = ssl._create_unverified_context() if args.insecure else None
+    try:
+        with request.urlopen(req, timeout=args.timeout, context=context) as response:
+            cookie = SimpleCookie(response.headers.get("Set-Cookie", ""))
+            value = cookie.get("codex_sync_session")
+            if value is None:
+                raise SyncError("login response did not include a session token")
+            records = read_auth_records()
+            records[auth_key(args.url, args.account)] = {"session_token": value.value, "insecure": args.insecure}
+            write_auth_records(records)
+        print(json.dumps({"status": "logged-in", "account": args.account, "url": args.url.rstrip("/")}, ensure_ascii=False))
+    except error.HTTPError as exc:
+        raise SyncError(f"login failed: HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')}") from exc
+    except error.URLError as exc:
+        raise SyncError(f"login failed: {exc.reason}") from exc
+
+
+def logout(args: argparse.Namespace) -> None:
+    records = read_auth_records()
+    record = records.pop(auth_key(args.url, args.account), None)
+    if isinstance(record, dict) and isinstance(record.get("session_token"), str):
+        req = request.Request(
+            f"{args.url.rstrip('/')}/v1/auth/logout",
+            data=b"",
+            method="POST",
+            headers={"Cookie": f"codex_sync_session={record['session_token']}"},
+        )
+        context = ssl._create_unverified_context() if args.insecure or record.get("insecure") else None
+        try:
+            request.urlopen(req, timeout=args.timeout, context=context).close()
+        except (error.HTTPError, error.URLError):
+            pass
+    write_auth_records(records)
+    print(json.dumps({"status": "logged-out", "account": args.account, "url": args.url.rstrip("/")}, ensure_ascii=False))
+
+
+def list_packages(args: argparse.Namespace) -> None:
+    req = request.Request(
+        f"{args.url.rstrip('/')}/v1/accounts/{args.account}/packages",
+        method="GET",
+        headers=authorization_header(args),
+    )
+    try:
+        with open_request(req, args) as response:
+            packages = json.loads(response.read())
+    except error.HTTPError as exc:
+        raise SyncError(f"list failed: HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')}") from exc
+    except error.URLError as exc:
+        raise SyncError(f"list failed: {exc.reason}") from exc
+    if args.tag:
+        packages["packages"] = [package for package in packages.get("packages", []) if package.get("tag") == args.tag]
+    print(json.dumps(packages, ensure_ascii=False, indent=2))
 
 
 def push(args: argparse.Namespace) -> None:
@@ -403,6 +497,27 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(description="Lossless file-level Codex session sync proof of concept")
     commands = root.add_subparsers(dest="command", required=True)
 
+    def add_connection(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--url", required=True)
+        command.add_argument("--account", required=True)
+        command.add_argument("--timeout", type=float, default=60)
+        command.add_argument("--insecure", action="store_true", help="allow a self-signed HTTPS certificate")
+
+    login_command = commands.add_parser("login", help="sign in and save a local session token")
+    add_connection(login_command)
+    login_command.set_defaults(func=login)
+
+    logout_command = commands.add_parser("logout", help="remove the saved local session token")
+    add_connection(logout_command)
+    logout_command.set_defaults(func=logout)
+
+    list_command = commands.add_parser("list", help="list packages in the cloud repository")
+    add_connection(list_command)
+    list_command.add_argument("--tag", help="optional tag filter")
+    list_command.add_argument("--username", help=argparse.SUPPRESS)
+    list_command.add_argument("--password-env", default="CODEX_SYNC_PASSWORD", help=argparse.SUPPRESS)
+    list_command.set_defaults(func=list_packages)
+
     pack_command = commands.add_parser("pack", help="package one session JSONL and its threads registry row")
     pack_command.add_argument("--session", required=True)
     pack_command.add_argument("--output", required=True)
@@ -453,12 +568,13 @@ def parser() -> argparse.ArgumentParser:
     pull_command.add_argument("--replace-registration", action="store_true")
     pull_command.set_defaults(func=pull)
 
-    restore_command = commands.add_parser("restore", help="restore one package below CODEX_HOME/sessions")
-    restore_command.add_argument("--package", required=True)
-    restore_command.add_argument("--codex-home", default=str(default_codex_home()))
-    restore_command.add_argument("--replace", action="store_true")
-    restore_command.add_argument("--replace-registration", action="store_true")
-    restore_command.set_defaults(func=restore)
+    for name, help_text in (("load", "load one local package into Codex"), ("restore", "restore one package below CODEX_HOME/sessions")):
+        restore_command = commands.add_parser(name, help=help_text)
+        restore_command.add_argument("--package", required=True)
+        restore_command.add_argument("--codex-home", default=str(default_codex_home()))
+        restore_command.add_argument("--replace", action="store_true")
+        restore_command.add_argument("--replace-registration", action="store_true")
+        restore_command.set_defaults(func=restore)
     return root
 
 
