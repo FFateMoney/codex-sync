@@ -428,7 +428,7 @@
     function renderCloud() {
       const selected = document.querySelector('#cloud-tag-filter').value; const visible = cloudPackages.filter(item => selected === 'all' || item.tag === selected); cloudThreads.replaceChildren();
       for (const item of visible) {
-        const row = document.createElement('tr'); const title = document.createElement('td'); const heading = document.createElement('div'); heading.className = 'thread-title'; heading.textContent = item.title || item.package_id; const id = document.createElement('div'); id.className = 'thread-id'; id.textContent = item.thread_id || item.package_id; title.append(heading, id);
+        const row = document.createElement('tr'); const title = document.createElement('td'); const heading = document.createElement('div'); heading.className = 'thread-title'; heading.textContent = item.title || item.package_id; const id = document.createElement('div'); id.className = 'thread-id'; id.textContent = `包 ${item.package_id}`; title.append(heading, id);
         const tag = document.createElement('td'); tag.innerHTML = `<span class="tag">${item.tag}</span>`; const time = document.createElement('td'); time.textContent = formatTime(item.modified_at); const bytes = document.createElement('td'); bytes.textContent = formatBytes(item.bytes);
         const actions = document.createElement('td'); const group = document.createElement('div'); group.className = 'action-group'; const download = document.createElement('button'); download.className = 'row-action'; download.type = 'button'; download.textContent = '下载包'; download.addEventListener('click', () => downloadPackage(item)); group.append(download); actions.append(group); row.append(title, tag, time, bytes, actions); cloudThreads.append(row);
       }
