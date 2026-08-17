@@ -8,6 +8,7 @@ one session archive as bytes under its original path below CODEX_HOME.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import io
 import json
@@ -15,6 +16,7 @@ import os
 from pathlib import Path
 import re
 import sqlite3
+import ssl
 import sys
 import tarfile
 import tempfile
@@ -41,7 +43,7 @@ def sha256_path(path: Path) -> str:
 
 
 def default_codex_home() -> Path:
-    return Path.home() / ".codex"
+    return Path(os.environ.get("CODEX_HOME", Path.home() / ".codex"))
 
 
 def session_relative_path(session: Path, codex_home: Path) -> Path:
@@ -151,17 +153,37 @@ def url_for(args: argparse.Namespace) -> str:
     return f"{args.url.rstrip('/')}/v1/accounts/{args.account}/tags/{args.tag}/packages/{args.package_id}"
 
 
+def authorization_header(args: argparse.Namespace) -> dict[str, str]:
+    password = os.environ.get(args.password_env)
+    if password is None:
+        raise SyncError(f"set {args.password_env} before connecting to the authenticated service")
+    username = args.username or args.account
+    credential = base64.b64encode(f"{username}:{password}".encode("utf-8")).decode("ascii")
+    return {"Authorization": f"Basic {credential}"}
+
+
+def open_request(req: request.Request, args: argparse.Namespace):
+    context = ssl._create_unverified_context() if args.insecure else None
+    return request.urlopen(req, timeout=args.timeout, context=context)
+
+
 def upload(args: argparse.Namespace) -> None:
     package = Path(args.package).expanduser()
     package_hash = sha256_path(package)
+    headers = {
+        "Content-Type": "application/gzip",
+        "Content-Length": str(package.stat().st_size),
+        "X-Content-SHA256": package_hash,
+    }
+    headers.update(authorization_header(args))
     req = request.Request(
         url_for(args),
         data=package.read_bytes(),
         method="PUT",
-        headers={"Content-Type": "application/gzip", "Content-Length": str(package.stat().st_size), "X-Content-SHA256": package_hash},
+        headers=headers,
     )
     try:
-        with request.urlopen(req, timeout=args.timeout) as response:
+        with open_request(req, args) as response:
             print(response.read().decode("utf-8"))
     except error.HTTPError as exc:
         raise SyncError(f"upload failed: HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')}") from exc
@@ -172,9 +194,9 @@ def upload(args: argparse.Namespace) -> None:
 def download(args: argparse.Namespace) -> None:
     output = Path(args.output).expanduser()
     output.parent.mkdir(parents=True, exist_ok=True)
-    req = request.Request(url_for(args), method="GET")
+    req = request.Request(url_for(args), method="GET", headers=authorization_header(args))
     try:
-        with request.urlopen(req, timeout=args.timeout) as response:
+        with open_request(req, args) as response:
             expected_hash = response.headers.get("X-Content-SHA256")
             with tempfile.NamedTemporaryFile(dir=output.parent, delete=False) as temp:
                 temporary_path = Path(temp.name)
@@ -209,6 +231,9 @@ def push(args: argparse.Namespace) -> None:
                 package_id=package_id,
                 package=str(package),
                 timeout=args.timeout,
+                username=args.username,
+                password_env=args.password_env,
+                insecure=args.insecure,
             )
         )
     print(json.dumps({"status": "uploaded", "package_id": package_id}, ensure_ascii=False))
@@ -225,6 +250,9 @@ def pull(args: argparse.Namespace) -> None:
                 package_id=args.package_id,
                 output=str(package),
                 timeout=args.timeout,
+                username=args.username,
+                password_env=args.password_env,
+                insecure=args.insecure,
             )
         )
         restore(
@@ -381,6 +409,10 @@ def parser() -> argparse.ArgumentParser:
     pack_command.add_argument("--codex-home", default=str(default_codex_home()))
     pack_command.set_defaults(func=pack)
 
+    def add_credentials(command: argparse.ArgumentParser) -> None:
+        command.add_argument("--username", help="authenticated username; defaults to --account")
+        command.add_argument("--password-env", default="CODEX_SYNC_PASSWORD", help="environment variable containing the password")
+
     for name, func, help_text in (("upload", upload, "upload a package"), ("download", download, "download a package")):
         command = commands.add_parser(name, help=help_text)
         command.add_argument("--url", required=True)
@@ -388,6 +420,8 @@ def parser() -> argparse.ArgumentParser:
         command.add_argument("--tag", required=True)
         command.add_argument("--package-id", required=True)
         command.add_argument("--timeout", type=float, default=60)
+        command.add_argument("--insecure", action="store_true", help="allow a self-signed HTTPS certificate")
+        add_credentials(command)
         if name == "upload":
             command.add_argument("--package", required=True)
         else:
@@ -402,6 +436,8 @@ def parser() -> argparse.ArgumentParser:
     push_command.add_argument("--codex-home", default=str(default_codex_home()))
     push_command.add_argument("--package-id", help="optional immutable package ID; default includes UUID and content hash")
     push_command.add_argument("--timeout", type=float, default=60)
+    push_command.add_argument("--insecure", action="store_true", help="allow a self-signed HTTPS certificate")
+    add_credentials(push_command)
     push_command.set_defaults(func=push)
 
     pull_command = commands.add_parser("pull", help="download, restore, and register one Codex thread")
@@ -411,6 +447,8 @@ def parser() -> argparse.ArgumentParser:
     pull_command.add_argument("--package-id", required=True)
     pull_command.add_argument("--codex-home", default=str(default_codex_home()))
     pull_command.add_argument("--timeout", type=float, default=60)
+    pull_command.add_argument("--insecure", action="store_true", help="allow a self-signed HTTPS certificate")
+    add_credentials(pull_command)
     pull_command.add_argument("--replace", action="store_true")
     pull_command.add_argument("--replace-registration", action="store_true")
     pull_command.set_defaults(func=pull)

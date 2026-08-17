@@ -3,59 +3,161 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>codex-sync · 本地访问</title>
+  <title>codex-sync</title>
+  <script src="/static/sql-wasm.js"></script>
   <style>
     :root { color-scheme: dark; font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; }
-    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at top, #1f3b5a, #0d1117 46%); }
-    main { width: min(680px, calc(100% - 40px)); padding: 44px; border: 1px solid #30363d; border-radius: 18px; background: #161b22e8; box-shadow: 0 20px 70px #0008; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at top, #1f3b5a, #0d1117 48%); }
+    main { width: min(960px, calc(100% - 40px)); margin: 6vh auto; padding: 38px; border: 1px solid #30363d; border-radius: 18px; background: #161b22eb; box-shadow: 0 20px 70px #0008; }
+    .narrow { max-width: 580px; margin: 0 auto; }
     .eyebrow { color: #58a6ff; font-size: .82rem; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
-    h1 { font-size: clamp(2rem, 5vw, 3.25rem); margin: .35rem 0 1rem; letter-spacing: -.04em; }
-    p { line-height: 1.65; color: #b1bac4; }
-    button { margin: 1.2rem 0; padding: 13px 19px; border: 0; border-radius: 9px; color: #061525; background: #58a6ff; font-size: 1rem; font-weight: 700; cursor: pointer; }
+    h1 { font-size: clamp(2rem, 5vw, 3.1rem); margin: .35rem 0 1rem; letter-spacing: -.04em; }
+    h2 { margin: 0; font-size: 1.25rem; }
+    p, .muted { line-height: 1.65; color: #b1bac4; }
+    form { display: grid; gap: .8rem; margin-top: 1.4rem; }
+    label { color: #b1bac4; font-size: .88rem; }
+    input { box-sizing: border-box; width: 100%; padding: 12px; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; background: #0d1117; font: inherit; }
+    button { padding: 12px 17px; border: 0; border-radius: 9px; color: #061525; background: #58a6ff; font: inherit; font-weight: 700; cursor: pointer; }
     button:hover { background: #79c0ff; }
-    .status { padding: 16px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; white-space: pre-line; }
-    .path-help { margin-top: 1.4rem; padding: 16px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; }
-    .path-help p { margin: 0 0 .65rem; }
-    .path-help p:last-child { margin-bottom: 0; }
-    .command { display: flex; align-items: center; gap: .7rem; padding: .7rem .8rem; border-radius: 7px; background: #010409; }
-    .command code { overflow-x: auto; white-space: nowrap; flex: 1; }
-    .copy { margin: 0; padding: .45rem .65rem; font-size: .82rem; white-space: nowrap; background: #21262d; color: #e6edf3; }
-    .copy:hover { background: #30363d; }
-    .ok { border-color: #238636; color: #7ee787; }
+    button.secondary { color: #e6edf3; background: #21262d; }
+    button.secondary:hover { background: #30363d; }
+    .status, .path-help { margin-top: 1.2rem; padding: 14px; border-radius: 10px; background: #0d1117; border: 1px solid #30363d; white-space: pre-line; }
     .warning { border-color: #9e6a03; color: #e3b341; }
-    code { color: #79c0ff; }
-    input { display: none; }
+    .ok { border-color: #238636; color: #7ee787; }
+    .row { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
+    .stack { display: grid; gap: 16px; }
+    .command { display: flex; align-items: center; gap: .7rem; padding: .7rem .8rem; border-radius: 7px; background: #010409; }
+    .command code { overflow-x: auto; white-space: nowrap; flex: 1; color: #79c0ff; }
+    .copy { margin: 0; padding: .45rem .65rem; font-size: .82rem; white-space: nowrap; }
+    .account { font-size: .9rem; color: #7ee787; }
+    .list-header { margin-top: 2rem; }
+    .count { color: #8b949e; font-size: .9rem; }
+    .threads { margin-top: 1rem; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
+    .thread { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 18px; padding: 14px 16px; border-bottom: 1px solid #30363d; }
+    .thread:last-child { border-bottom: 0; }
+    .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+    .details { color: #8b949e; font-size: .82rem; }
+    .archived { color: #d29922; font-size: .78rem; }
+    [hidden] { display: none !important; }
+    @media (max-width: 620px) { main { width: calc(100% - 28px); margin: 14px auto; padding: 24px; } .row { align-items: flex-start; flex-direction: column; } .thread { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">codex-sync · step 1</div>
-    <h1>授权本机 Codex 文件夹</h1>
-    <p>点击后，请在系统选择器中选择 <code>.codex</code> 文件夹。网页只会在你选择后读取该目录；本页不会上传任何文件。</p>
-    <button id="grant">选择 .codex 文件夹</button>
-    <input id="fallback" type="file" webkitdirectory multiple>
-    <div id="status" class="status">尚未授权本地文件夹。</div>
-    <section class="path-help" aria-label="本机 Codex 文件夹位置">
-      <p><strong>常用位置</strong>：macOS / Linux 通常为 <code>~/.codex</code>。如果你设置过 <code>CODEX_HOME</code>，请以它为准。</p>
-      <div class="command">
-        <code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code>
-        <button class="copy" id="copy-command" type="button">复制命令</button>
-      </div>
-      <p>在终端运行此命令会显示应在文件选择器中打开的目录。macOS 中按 <code>⌘⇧G</code> 可直接前往该位置；若看不到隐藏文件，按 <code>⌘⇧.</code>。</p>
+    <section id="login-view" class="narrow">
+      <div class="eyebrow">codex-sync</div>
+      <h1>登录你的同步仓库</h1>
+      <p>此服务当前只允许已开通的账户登录，不提供注册入口。</p>
+      <form id="login-form">
+        <label>账户名 <input id="username" name="username" value="jasper" autocomplete="username" required></label>
+        <label>密码 <input id="password" name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">登录</button>
+      </form>
+      <div id="login-status" class="status">请使用已开通的账户登录。</div>
     </section>
-    <p>推荐 Chrome 或 Edge。首次使用时可能需要在文件选择器中显示隐藏文件（macOS：<code>⌘⇧.</code>）。</p>
+
+    <section id="grant-view" class="narrow" hidden>
+      <div class="eyebrow">已登录</div>
+      <h1>授权本机 Codex 文件夹</h1>
+      <p>登录后仍须由你手动选择本机 <code>.codex</code> 文件夹。网页仅读取标题索引以显示列表；不会上传聊天内容。</p>
+      <button id="grant" type="button">选择 .codex 文件夹</button>
+      <input id="fallback" type="file" webkitdirectory multiple hidden>
+      <div id="grant-status" class="status">尚未授权本地文件夹。</div>
+      <section class="path-help" aria-label="本机 Codex 文件夹位置">
+        <p><strong>常用位置</strong>：macOS / Linux 通常为 <code>~/.codex</code>。若设置了 <code>CODEX_HOME</code>，请以它为准。</p>
+        <div class="command">
+          <code id="path-command">printf '%s\n' &quot;${CODEX_HOME:-$HOME/.codex}&quot;</code>
+          <button class="secondary copy" id="copy-command" type="button">复制命令</button>
+        </div>
+        <p>macOS 文件选择器按 <code>⌘⇧G</code> 可直接前往该位置；若看不到隐藏文件，按 <code>⌘⇧.</code>。</p>
+      </section>
+    </section>
+
+    <section id="dashboard-view" hidden>
+      <div class="row">
+        <div><div class="eyebrow">本地 Codex</div><h1>对话列表</h1></div>
+        <div class="stack"><span id="account" class="account"></span><button id="logout" class="secondary" type="button">退出登录</button></div>
+      </div>
+      <p id="summary" class="muted"></p>
+      <div class="row list-header"><h2>所有本地对话</h2><span id="thread-count" class="count"></span></div>
+      <div id="threads" class="threads"></div>
+      <p class="muted">标题来自你授权目录中的 <code>state_5.sqlite</code>；聊天 JSONL 内容未在此步骤读取或上传。</p>
+    </section>
   </main>
   <script>
-    const status = document.querySelector('#status');
+    const loginView = document.querySelector('#login-view');
+    const grantView = document.querySelector('#grant-view');
+    const dashboardView = document.querySelector('#dashboard-view');
+    const loginStatus = document.querySelector('#login-status');
+    const grantStatus = document.querySelector('#grant-status');
     const fallback = document.querySelector('#fallback');
-    const copyCommand = document.querySelector('#copy-command');
-    const say = (message, kind = '') => { status.textContent = message; status.className = `status ${kind}`; };
+    const sqlReady = initSqlJs({ locateFile: file => `/static/${file}` });
+
+    const say = (element, message, kind = '') => { element.textContent = message; element.className = `status ${kind}`; };
+    const show = (view) => {
+      for (const element of [loginView, grantView, dashboardView]) element.hidden = element !== view;
+    };
+    const requestJson = async (path, options = {}) => {
+      const response = await fetch(path, { credentials: 'same-origin', ...options });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `请求失败（HTTP ${response.status}）`);
+      return body;
+    };
+    const formatTime = (value) => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(Number(value) * 1000)) : '未知时间';
+
+    function showDashboard(account, threads, sessions) {
+      document.querySelector('#account').textContent = `账户：${account}`;
+      document.querySelector('#summary').textContent = `已读取本机索引，发现 ${threads.length} 条线程记录与 ${sessions} 个会话档案。`;
+      document.querySelector('#thread-count').textContent = `${threads.length} 条`;
+      const container = document.querySelector('#threads');
+      container.replaceChildren();
+      if (!threads.length) {
+        container.textContent = '未找到线程记录。';
+      } else {
+        for (const thread of threads) {
+          const item = document.createElement('div');
+          item.className = 'thread';
+          const title = document.createElement('div');
+          title.className = 'title';
+          title.textContent = thread.title || thread.firstUserMessage || '未命名对话';
+          const date = document.createElement('div');
+          date.className = 'details';
+          date.textContent = formatTime(thread.updatedAt);
+          const details = document.createElement('div');
+          details.className = 'details';
+          details.textContent = thread.id;
+          item.append(title, date, details);
+          if (thread.archived) {
+            const archived = document.createElement('span');
+            archived.className = 'archived';
+            archived.textContent = '已归档';
+            item.append(archived);
+          }
+          container.append(item);
+        }
+      }
+      show(dashboardView);
+    }
+
+    async function readIndex(databaseFile) {
+      const SQL = await sqlReady;
+      const database = new SQL.Database(new Uint8Array(await databaseFile.arrayBuffer()));
+      try {
+        const result = database.exec('SELECT id, title, first_user_message, updated_at, archived FROM threads ORDER BY recency_at DESC, updated_at DESC');
+        const rows = result.length ? result[0].values : [];
+        return rows.map(([id, title, firstUserMessage, updatedAt, archived]) => ({ id, title, firstUserMessage, updatedAt, archived: Boolean(archived) }));
+      } finally {
+        database.close();
+      }
+    }
+
     async function inspectDirectory(directory) {
-      let sessions = 0, foundDb = false;
+      let sessions = 0;
+      let databaseFile;
       async function walk(handle, inSessions = false) {
         for await (const [name, child] of handle.entries()) {
           if (child.kind === 'file') {
-            if (name === 'state_5.sqlite') foundDb = true;
+            if (name === 'state_5.sqlite') databaseFile = await child.getFile();
             if (inSessions && name.endsWith('.jsonl')) sessions++;
           } else if (child.kind === 'directory') {
             await walk(child, inSessions || name === 'sessions');
@@ -63,35 +165,80 @@
         }
       }
       await walk(directory);
-      say(`已授权：${directory.name}\n检测到 ${sessions} 个会话档案${foundDb ? '，并找到线程标题索引。' : '，但未找到 state_5.sqlite。'}\n尚未上传任何内容。`, 'ok');
+      return { databaseFile, sessions };
     }
+
+    async function loadAndDisplay(databaseFile, sessions) {
+      if (!databaseFile) throw new Error('未找到 state_5.sqlite；请选择 .codex 文件夹。');
+      say(grantStatus, '正在读取本机线程标题索引…');
+      const account = await requestJson('/v1/auth/me');
+      const threads = await readIndex(databaseFile);
+      showDashboard(account.account, threads, sessions);
+    }
+
+    document.querySelector('#login-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const username = document.querySelector('#username').value;
+      const password = document.querySelector('#password').value;
+      say(loginStatus, '正在验证账户…');
+      try {
+        await requestJson('/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+        document.querySelector('#password').value = '';
+        show(grantView);
+      } catch (error) {
+        say(loginStatus, `登录失败：${error.message}`, 'warning');
+      }
+    });
+
     document.querySelector('#grant').addEventListener('click', async () => {
       try {
         if ('showDirectoryPicker' in window) {
-          const directory = await window.showDirectoryPicker({ mode: 'read' });
-          await inspectDirectory(directory);
+          const selection = await window.showDirectoryPicker({ mode: 'read' });
+          const { databaseFile, sessions } = await inspectDirectory(selection);
+          await loadAndDisplay(databaseFile, sessions);
         } else {
           fallback.click();
         }
       } catch (error) {
-        say(`未授予访问权限：${error.message}`, 'warning');
+        say(grantStatus, `无法读取目录：${error.message}`, 'warning');
       }
     });
-    fallback.addEventListener('change', () => {
-      const files = [...fallback.files];
-      const sessions = files.filter(file => file.webkitRelativePath.includes('/sessions/') && file.name.endsWith('.jsonl')).length;
-      const foundDb = files.some(file => file.name === 'state_5.sqlite');
-      say(`已通过兼容模式选择目录。\n检测到 ${sessions} 个会话档案${foundDb ? '，并找到线程标题索引。' : '。'}\n刷新页面后需要重新选择；尚未上传任何内容。`, 'ok');
+
+    fallback.addEventListener('change', async () => {
+      try {
+        const files = [...fallback.files];
+        const databaseFile = files.find(file => file.name === 'state_5.sqlite');
+        const sessions = files.filter(file => file.webkitRelativePath.includes('/sessions/') && file.name.endsWith('.jsonl')).length;
+        await loadAndDisplay(databaseFile, sessions);
+      } catch (error) {
+        say(grantStatus, `无法读取目录：${error.message}`, 'warning');
+      }
     });
-    copyCommand.addEventListener('click', async () => {
+
+    document.querySelector('#copy-command').addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(document.querySelector('#path-command').textContent);
-        copyCommand.textContent = '已复制';
-        setTimeout(() => { copyCommand.textContent = '复制命令'; }, 1600);
+        document.querySelector('#copy-command').textContent = '已复制';
+        setTimeout(() => { document.querySelector('#copy-command').textContent = '复制命令'; }, 1600);
       } catch {
-        say('无法自动复制，请手动复制上方命令。', 'warning');
+        say(grantStatus, '无法自动复制，请手动复制上方命令。', 'warning');
       }
     });
+
+    document.querySelector('#logout').addEventListener('click', async () => {
+      await requestJson('/v1/auth/logout', { method: 'POST' });
+      show(loginView);
+      say(loginStatus, '已退出登录。');
+    });
+
+    (async () => {
+      try {
+        await requestJson('/v1/auth/me');
+        show(grantView);
+      } catch {
+        show(loginView);
+      }
+    })();
   </script>
 </body>
 </html>
